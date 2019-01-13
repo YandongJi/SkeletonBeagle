@@ -350,8 +350,8 @@ int main(int argc, char *argv[])
 	rc_set_state(RUNNING);
 	
 	// see if threads are set up
-	printf("setpoint thread properties:");
-	rc_pthread_print_properties(setpoint_thread);
+	printf("printf thread properties:");
+	rc_pthread_print_properties(printf_thread);
 	printf("telemetry thread properties:");
 	rc_pthread_print_properties(telem_thread);
 
@@ -903,11 +903,36 @@ static void __on_mode_release(void)
  * @return     nothing, NULL pointer
  */
 
+// static void* telem_loop(__attribute__ ((unused)) void* ptr)
+// {  // just data for csv format
+// 	start_time = rc_nanos_thread_time();
+//  //   fprintf(logfile, "%ld, ", ticks);
+//  //   fprintf(logfile, "%" PRIu64 "\n",start_time);
+//     printf("telem thread\n");
+//     fflush(stdout); // empty buffer on every thread pass
+// 	return NULL;
+// }
+
+/**
+ * prints diagnostics to console this only gets started if executing from
+ * terminal
+ *
+ * @return     nothing, NULL pointer
+ */
 static void* telem_loop(__attribute__ ((unused)) void* ptr)
-{  // just data for csv format
-	start_time = rc_nanos_thread_time();
-    fprintf(logfile, "%ld, ", ticks);
-    fprintf(logfile, "%" PRIu64 "\n",start_time);
-    printf("telem thread\n");
+{	long old_tick=0;
+	printf("telem thread\n");
+    fflush(stdout); // empty buffer on every thread pass
+	while(rc_get_state()!=EXITING)
+	{  // just data for csv format
+		start_time = rc_nanos_thread_time();
+		old_tick = ticks;
+		fprintf(logfile, "%ld, ", old_tick);  // pass value which not changing by other process
+		fprintf(logfile, "%" PRIu64 "\n",start_time);
+		while(old_tick == ticks)
+		{ rc_usleep(100); // sleep 100 us
+		}
+    }
+	rc_usleep(1000000 / PRINTF_HZ);
 	return NULL;
 }
