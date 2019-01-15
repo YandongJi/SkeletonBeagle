@@ -658,6 +658,9 @@ static void __balance_controller(void)
 	***********************************************************/
 	dutyL = cstate.d1_u - cstate.d3_u;
 	dutyR = cstate.d1_u + cstate.d3_u;
+	dutyL = fmax(-0.3, fmin(dutyL,0.3));
+	dutyR = fmax(-0.3, fmin(dutyR,0.3));
+	//fprintf(logfile, "%6.3f , %6.3f  ", dutyL, dutyR);  // only for debugging- file IO slows down control
 	rc_motor_set(MOTOR_CHANNEL_L, MOTOR_POLARITY_L * dutyL);
 	rc_motor_set(MOTOR_CHANNEL_R, MOTOR_POLARITY_R * dutyR);
 	// writeTelemetry(ticks,start_time); /* uncomment for direct telem rather than threaded */
