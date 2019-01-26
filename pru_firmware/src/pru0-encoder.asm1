@@ -53,19 +53,7 @@
 	.asg	14,			A
 	.asg	15,			B
 
-increment	.macro
-	LBCO	&r2, CONST_PRUSHAREDRAM, CNT_OFFSET, 4	; load existing counter from shared memory
-	ADD	r2, r2, 1		; increment
-	SBCO	&r2, CONST_PRUSHAREDRAM, CNT_OFFSET, 4	; write to shared memory
-	QBA CHECKPINS				; jump back to main CHECKPINS
-	.endm
 
-decrement	.macro
-	LBCO	&r2, CONST_PRUSHAREDRAM, CNT_OFFSET, 4	; load existing counter from shared memory
-	SUB 	r2, r2, 1		; subtract 1
-	SBCO	&r2, CONST_PRUSHAREDRAM, CNT_OFFSET, 4	; write to shared memory
-	QBA CHECKPINS				;/ jump back to main CHECKPINS
-	.endm
 
 	.clink
 	.global start
@@ -82,49 +70,20 @@ start:
 	MOV 	OLD, r31
 	zero	&r2, 4
 	SBCO	&r2, CONST_PRUSHAREDRAM, CNT_OFFSET, 4	; write 0 to shared memory
-; write a random value to verify that pru code is installing/running
-;	LDI		r2, 0x1000    
-;	SBCO	&r2, CONST_PRUSHAREDRAM, CNT_OFFSET, 4	; write r2 to shared memory
-
-; CHECKPINS here forever looking for pin changes
-CHECKPINS:
-;	SBCO	&r2, CONST_PRUSHAREDRAM, CNT_OFFSET, 4	; write r2 value to shared memory *for debugging *
-	XOR EXOR, OLD, r31
-	QBBS A_CHANGED, EXOR, A	; Branch if CHA has toggled
-	QBBS B_CHANGED, EXOR, B ; Branch if CHB has toggled
-	; try to add some code without breaking
-	ADD r3, r3, 1   	; increment
-	SBCO	&r3, CONST_PRUSHAREDRAM, CNT_OFFSET+4, 4	; write to shared memory +4
-	QBA CHECKPINS
+	LDI r5, 0x0000
+	ADDLDI 	r5, C28   ; store value in register to figure out where it is
 
 
-A_CHANGED:
-	XOR OLD, OLD, EXOR	; update old value now that something changed
-	QBBS CHECKPINS, EXOR, B ; Branch if CHA and CHB have both toggled
-	QBBC A_FELL,  OLD, A	; Branch if CHA has fallen
-	QBBS DECREMENT, OLD, B	; A has risen, if B is HIGH, decrement
-	increment		; otherwise increment
-
-B_CHANGED:
-	XOR OLD, OLD, EXOR	; update old value now that something changed
-	QBBC B_FELL,  OLD, B	; Branch if CHB has fallen
-	QBBS INCREMENT, OLD, A	; ch B has risen, if A is HIGH, increment
-	decrement		; otherwise decrement
-
-A_FELL:				; CHA has fallen, check CHB
-	QBBC DECREMENT, OLD, B	; if CHB is clear (low) decrement
-	increment		; CHB must be high, so decrement counter
-
-B_FELL:				; CHB has fallen, check CHA
-	QBBC INCREMENT, OLD, A	; if CHA is clear (low) decrement
-	decrement
-
-
-DECREMENT:
-	decrement
-
-INCREMENT:
-	increment
+; just decrement a counter to slow down. 5 ns x 20000 = 100 us
+MAINLOOP:
+	LDI r3, 20000
+	LDI r4, 0x0000
+WAITLOOP:
+	SUB r3, r3, 1   	; decrement
+	QBNE WAITLOOP, r3, r4  ; wait for countdown to zero
+	ADD r2, r2, 1			; increment r2
+	SBCO	&r2, CONST_PRUSHAREDRAM, CNT_OFFSET, 4	; write to shared memory
+	QBA MAINLOOP				; jump back to main 
 
 
 	HALT	; we should never actually get here

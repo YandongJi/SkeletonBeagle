@@ -14,6 +14,11 @@
 #include <rc/encoder_pru.h>
 #include <rc/time.h>
 
+#define ENCODER_MEM_OFFSET	16
+
+// pru shared memory pointer
+static volatile unsigned int* shared_mem_32bit_ptr = NULL;
+
 // global variables
 // Must be declared static so they get zero initalized
 static uint64_t start_time, end_time, run_time;
@@ -26,6 +31,7 @@ static void __signal_handler(__attribute__ ((unused)) int dummy)
 	running=0;
 	return;
 }
+
 
 int main()
 {	long value = 0;
@@ -55,6 +61,8 @@ int main()
 
 	while(running){
 		printf("\r%10d |", rc_encoder_pru_read());
+		printf("  r3=%x", 
+		(int) shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+1]);
 		fflush(stdout);
 		rc_usleep(50000);
 	}
