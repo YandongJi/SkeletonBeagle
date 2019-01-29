@@ -38,6 +38,7 @@
 #include <pru_cfg.h>
 #include <pru_ctrl.h>
 #include "resource_table_pru1.h"
+#include <sys_tscAdcSs.h>  // touch screen A/D?
 
 #define ENCODER_MEM_OFFSET	16
 #define PRU_SHAREDMEM 0x10000 // shared memory with Cortex A8?
@@ -45,8 +46,8 @@
 static volatile unsigned int* shared_mem_32bit_ptr = NULL;
 
 /* prototypes */
-extern void init_adc(void);
-extern uint16_t read_adc(uint16_t);
+void init_adc(void);
+uint16_t read_adc(uint16_t);
 
 // The function is defined in pru1_asm_blinky.asm in same dir
 // We just need to add a declaration here, the defination can be
@@ -54,7 +55,8 @@ extern uint16_t read_adc(uint16_t);
 extern void start(void);
 
 void main(void)
-{	int atod_value =0;
+{	int atod_value =0x7779;
+	int i;
 	/* Clear SYSCFG[STANDBY_INIT] to enable OCP master port */
 	CT_CFG.SYSCFG_bit.STANDBY_INIT = 0;
 	
@@ -67,9 +69,154 @@ void main(void)
 	shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+2] = 0x5a5a;
 	
 	init_adc();
-//	atod_value = read_adc(0);
+	atod_value = read_adc(5);  // channels are 5 to 8
 	shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+2] = atod_value;
 	
-	start();
+	// use locations [ENCODER_MEM_OFFSET] + 2....129 to hold line scan from A/D
+	for(i = 0; i< 128; i++){
+		shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+2+i] = read_adc(5); 
+	}
+	
+	start(); // start assembly language routine
+}
+
+/* *******************************************************
+*/
+
+/* A to D converter code from pru_adc_firmware.c
+ /usr/lib/ti/pru-software-support-package/examples/am335x/PRU_ADC
+ Jan. 29, 2019- converted from message passing to basic memory port interface for speed
+ and simplicity */
+
+/* Control Module registers to enable the ADC peripheral */
+#define CM_WKUP_CLKSTCTRL  (*((volatile unsigned int *)0x44E00400))
+#define CM_WKUP_ADC_TSC_CLKCTRL  (*((volatile unsigned int *)0x44E004BC))
+
+
+void init_adc()
+{	/* set the always on clock domain to NO_SLEEP. Enable ADC_TSC clock */
+	while (!(CM_WKUP_ADC_TSC_CLKCTRL == 0x02)) {
+		CM_WKUP_CLKSTCTRL = 0;
+		CM_WKUP_ADC_TSC_CLKCTRL = 0x02;
+		/* Optional: implement timeout logic. */
+	}
+
+	/* 
+	 * Set the ADC_TSC CTRL register. 
+	 * Disable TSC_ADC_SS module so we can program it.
+	 * Set step configuration registers to writable.
+	 */
+	ADC_TSC.CTRL_bit.ENABLE = 0;
+	ADC_TSC.CTRL_bit.STEPCONFIG_WRITEPROTECT_N_ACTIVE_LOW = 1;
+
+	/* 
+	 * set the ADC_TSC STEPCONFIG1 register for channel 5  
+	 * Mode = 0; SW enabled, one-shot
+	 * Averaging = 0x3; 8 sample average
+	 * SEL_INP_SWC_3_0 = 0x4 = Channel 5
+	 * use FIFO0
+	 */
+	ADC_TSC.STEPCONFIG1_bit.MODE = 0;
+	ADC_TSC.STEPCONFIG1_bit.AVERAGING = 3;
+	ADC_TSC.STEPCONFIG1_bit.SEL_INP_SWC_3_0 = 4;
+	ADC_TSC.STEPCONFIG1_bit.FIFO_SELECT = 0;
+
+	/*
+	 * set the ADC_TSC STEPCONFIG2 register for channel 6
+	 * Mode = 0; SW enabled, one-shot
+	 * Averaging = 0x3; 8 sample average
+	 * SEL_INP_SWC_3_0 = 0x5 = Channel 6
+	 * use FIFO0
+	 */
+	ADC_TSC.STEPCONFIG2_bit.MODE = 0;
+	ADC_TSC.STEPCONFIG2_bit.AVERAGING = 3;
+	ADC_TSC.STEPCONFIG2_bit.SEL_INP_SWC_3_0 = 5;
+	ADC_TSC.STEPCONFIG2_bit.FIFO_SELECT = 0;
+
+	/* 
+	 * set the ADC_TSC STEPCONFIG3 register for channel 7
+	 * Mode = 0; SW enabled, one-shot
+	 * Averaging = 0x3; 8 sample average
+	 * SEL_INP_SWC_3_0 = 0x6 = Channel 7
+	 * use FIFO0
+	 */
+	ADC_TSC.STEPCONFIG3_bit.MODE = 0;
+	ADC_TSC.STEPCONFIG3_bit.AVERAGING = 3;
+	ADC_TSC.STEPCONFIG3_bit.SEL_INP_SWC_3_0 = 6;
+	ADC_TSC.STEPCONFIG3_bit.FIFO_SELECT = 0;
+
+	/* 
+	 * set the ADC_TSC STEPCONFIG4 register for channel 8
+	 * Mode = 0; SW enabled, one-shot
+	 * Averaging = 0x3; 8 sample average
+	 * SEL_INP_SWC_3_0 = 0x7= Channel 8
+	 * use FIFO0
+	 */
+	ADC_TSC.STEPCONFIG4_bit.MODE = 0;
+	ADC_TSC.STEPCONFIG4_bit.AVERAGING = 3;
+	ADC_TSC.STEPCONFIG4_bit.SEL_INP_SWC_3_0 = 7;
+	ADC_TSC.STEPCONFIG4_bit.FIFO_SELECT = 0;
+
+	/* 
+	 * set the ADC_TSC CTRL register
+	 * set step configuration registers to protected
+	 * store channel ID tag if needed for debug
+	 * Enable TSC_ADC_SS module
+	 */
+	ADC_TSC.CTRL_bit.STEPCONFIG_WRITEPROTECT_N_ACTIVE_LOW = 0;
+	ADC_TSC.CTRL_bit.STEP_ID_TAG = 1;
+	ADC_TSC.CTRL_bit.ENABLE = 1;
+}
+
+uint16_t read_adc(uint16_t adc_chan)
+{
+	/* 
+	 * Clear FIFO0 by reading from it
+	 * We are using single-shot mode. 
+	 * It should not usually enter the for loop
+	 */
+	uint32_t count = ADC_TSC.FIFO0COUNT;
+	uint32_t data;
+	uint32_t i;
+	for (i = 0; i < count; i++) {
+		data = ADC_TSC.FIFO0DATA;
+	}
+
+	/* read from the specified ADC channel */
+	switch (adc_chan) {
+		case 5 :
+			ADC_TSC.STEPENABLE_bit.STEP1 = 1;
+		case 6 :
+			ADC_TSC.STEPENABLE_bit.STEP2 = 1;
+		case 7 :
+			ADC_TSC.STEPENABLE_bit.STEP3 = 1;
+		case 8 :
+			ADC_TSC.STEPENABLE_bit.STEP4 = 1;
+		default :
+			/* 
+			 * this error condition should not occur because of
+			 * checks in userspace code
+			 */
+			ADC_TSC.STEPENABLE_bit.STEP1 = 1;
+	}
+
+	while (ADC_TSC.FIFO0COUNT == 0) {
+		/*
+		 * loop until value placed in fifo.
+		 * Optional: implement timeout logic.
+		 *
+		 * Other potential options include: 
+		 *   - configure PRU to receive an ADC interrupt. Note that 
+		 *     END_OF_SEQUENCE does not mean that the value has been
+		 *     loaded into the FIFO yet
+		 *   - perform other actions, and periodically poll for 
+		 *     FIFO0COUNT > 0
+		 */
+	}
+
+	/* read the voltage */
+	uint16_t voltage = ADC_TSC.FIFO0DATA_bit.ADCDATA;
+
+	return voltage;
 }
 

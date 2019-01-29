@@ -69,6 +69,8 @@ int main()
 		printf("\r%10d |", rc_encoder_pru_read());
 		printf("  r3=%x", 
 		(int) shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+1]);  // supposed to be written from PRU, next word above
+		printf("  shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+2]=%x", 
+		(int) shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+2]);  // supposed to be written from PRU, next word above
 		fflush(stdout);
 		rc_usleep(50000);
 	}
