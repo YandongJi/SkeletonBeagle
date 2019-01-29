@@ -13,6 +13,7 @@
 #include <inttypes.h> // for PRIu64
 #include <rc/encoder_pru.h>
 #include <rc/time.h>
+#include <rc/pru.h>
 
 #define ENCODER_MEM_OFFSET	16
 
@@ -58,11 +59,16 @@ int main()
 	run_time = end_time - start_time;
 	printf("Encoder 1e6 reads. Total = %ld. Takes: %" PRIu64 "us\n",value, run_time/1000);
 
-
+	shared_mem_32bit_ptr = rc_pru_shared_mem_ptr();
+	if(shared_mem_32bit_ptr==NULL){
+		fprintf(stderr, "ERROR in rc_encoder_pru_init, failed to map shared memory pointer\n");
+		return -1;
+	}
+	
 	while(running){
 		printf("\r%10d |", rc_encoder_pru_read());
 		printf("  r3=%x", 
-		(int) shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+1]);
+		(int) shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+1]);  // supposed to be written from PRU, next word above
 		fflush(stdout);
 		rc_usleep(50000);
 	}
