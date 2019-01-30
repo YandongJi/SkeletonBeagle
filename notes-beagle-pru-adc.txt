@@ -1,0 +1,42 @@
+January 30, 2019
+Notes on using ADC with PRU.
+
+1. Starting with 
+init_adc() and read_adc(chan) from
+/usr/lib/ti/pru-software-support-package/examples/am335x/PRU_ADC
+
+which are added to main_pru0.c
+
+2. changed code to read from channels 0 to 3.
+
+Using read_adc(0) seem to get multiple channels.
+maybe need to disable other channels so it doesn't get in FIFO?
+
+
+not consistent, reading chan 0 to 3 instead of just 0...
+
+Need to empty FIFO?
+
+
+With Chan0=1.8, and Chan 1=0.0, get:
+fff        0      83b      636      fff        0      63b      602 
+or 
+ 0      fff        0      83a      627      fff        0      639      5fb    
+With Chan0=0 and Chan 1=1.8, get:
+fff        0      fff      f9a      96b        0      fff      f98 
+or
+fff        0      fff      f9d      96d        0      fff      f97      baf  
+
+3. Are STEPENABLE ever set to zero? Maybe extra channels are turned on?
+   ADC_TSC.STEPENABLE_bit.STEP1 
+Add reset of STEPENABLE to init_adc()?
+#include <sys_tscAdcSs.h>  // touch screen A/D?
+/usr/lib/ti/pru-software-support-package/include
+added:
+ADC_TSC.STEPENABLE = ADC_TSC.STEPENABLE & 0xfffe0000;
+
+Still reads 4 channels...
+
+Maybe runs anyway?
+
+4. in init_adc(), set each step to point to chan 0.

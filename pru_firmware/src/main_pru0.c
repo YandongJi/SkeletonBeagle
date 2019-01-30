@@ -69,12 +69,13 @@ void main(void)
 	shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+2] = 0x5a5a;
 	
 	init_adc();
-	atod_value = read_adc(5);  // channels are 5 to 8
-	shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+2] = atod_value;
+	// atod_value = read_adc(0);  // channels are 0 to 3
+	// shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+2] = atod_value;
+	
 	
 	// use locations [ENCODER_MEM_OFFSET] + 2....129 to hold line scan from A/D
 	for(i = 0; i< 128; i++){
-		shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+2+i] = read_adc(5); 
+		shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+2+i] = read_adc(0); 
 	}
 	
 	start(); // start assembly language routine
@@ -110,51 +111,59 @@ void init_adc()
 	ADC_TSC.CTRL_bit.STEPCONFIG_WRITEPROTECT_N_ACTIVE_LOW = 1;
 
 	/* 
-	 * set the ADC_TSC STEPCONFIG1 register for channel 5  
+	* make sure no step is enabled, until channel is read with read_adc(chan)  
+	disbale TS_CHARGE and Steps 1-16
+	*/
+	ADC_TSC.STEPENABLE = ADC_TSC.STEPENABLE & 0xfffe0000;
+	
+	
+	// seems to read these channels, even if STEPENABLE is not set, so just go for channel 0.
+	/* 
+	 * set the ADC_TSC STEPCONFIG1 register for channel 0  
 	 * Mode = 0; SW enabled, one-shot
 	 * Averaging = 0x3; 8 sample average
-	 * SEL_INP_SWC_3_0 = 0x4 = Channel 5
+	 * SEL_INP_SWC_3_0 = 0x0 = Channel 0
 	 * use FIFO0
 	 */
 	ADC_TSC.STEPCONFIG1_bit.MODE = 0;
 	ADC_TSC.STEPCONFIG1_bit.AVERAGING = 3;
-	ADC_TSC.STEPCONFIG1_bit.SEL_INP_SWC_3_0 = 4;
+	ADC_TSC.STEPCONFIG1_bit.SEL_INP_SWC_3_0 = 0;
 	ADC_TSC.STEPCONFIG1_bit.FIFO_SELECT = 0;
 
 	/*
-	 * set the ADC_TSC STEPCONFIG2 register for channel 6
+	 * set the ADC_TSC STEPCONFIG2 register for channel 1
 	 * Mode = 0; SW enabled, one-shot
 	 * Averaging = 0x3; 8 sample average
-	 * SEL_INP_SWC_3_0 = 0x5 = Channel 6
+	 * SEL_INP_SWC_3_0 = 0x1 = Channel 1
 	 * use FIFO0
 	 */
 	ADC_TSC.STEPCONFIG2_bit.MODE = 0;
 	ADC_TSC.STEPCONFIG2_bit.AVERAGING = 3;
-	ADC_TSC.STEPCONFIG2_bit.SEL_INP_SWC_3_0 = 5;
+	ADC_TSC.STEPCONFIG2_bit.SEL_INP_SWC_3_0 = 0;  // chan 0
 	ADC_TSC.STEPCONFIG2_bit.FIFO_SELECT = 0;
 
 	/* 
-	 * set the ADC_TSC STEPCONFIG3 register for channel 7
+	 * set the ADC_TSC STEPCONFIG3 register for channel 2
 	 * Mode = 0; SW enabled, one-shot
 	 * Averaging = 0x3; 8 sample average
-	 * SEL_INP_SWC_3_0 = 0x6 = Channel 7
+	 * SEL_INP_SWC_3_0 = 0x2 = Channel 2
 	 * use FIFO0
 	 */
 	ADC_TSC.STEPCONFIG3_bit.MODE = 0;
 	ADC_TSC.STEPCONFIG3_bit.AVERAGING = 3;
-	ADC_TSC.STEPCONFIG3_bit.SEL_INP_SWC_3_0 = 6;
+	ADC_TSC.STEPCONFIG3_bit.SEL_INP_SWC_3_0 = 0; // chan 0
 	ADC_TSC.STEPCONFIG3_bit.FIFO_SELECT = 0;
 
 	/* 
-	 * set the ADC_TSC STEPCONFIG4 register for channel 8
+	 * set the ADC_TSC STEPCONFIG4 register for channel 3
 	 * Mode = 0; SW enabled, one-shot
 	 * Averaging = 0x3; 8 sample average
-	 * SEL_INP_SWC_3_0 = 0x7= Channel 8
+	 * SEL_INP_SWC_3_0 = 0x3= Channel 3
 	 * use FIFO0
 	 */
 	ADC_TSC.STEPCONFIG4_bit.MODE = 0;
 	ADC_TSC.STEPCONFIG4_bit.AVERAGING = 3;
-	ADC_TSC.STEPCONFIG4_bit.SEL_INP_SWC_3_0 = 7;
+	ADC_TSC.STEPCONFIG4_bit.SEL_INP_SWC_3_0 = 0; // chan 0
 	ADC_TSC.STEPCONFIG4_bit.FIFO_SELECT = 0;
 
 	/* 
@@ -183,14 +192,15 @@ uint16_t read_adc(uint16_t adc_chan)
 	}
 
 	/* read from the specified ADC channel */
+	/* are these ever disabled? maybe should be set to zero at init time... */
 	switch (adc_chan) {
-		case 5 :
+		case 0 :
 			ADC_TSC.STEPENABLE_bit.STEP1 = 1;
-		case 6 :
+		case 1 :
 			ADC_TSC.STEPENABLE_bit.STEP2 = 1;
-		case 7 :
+		case 2 :
 			ADC_TSC.STEPENABLE_bit.STEP3 = 1;
-		case 8 :
+		case 3 :
 			ADC_TSC.STEPENABLE_bit.STEP4 = 1;
 		default :
 			/* 
