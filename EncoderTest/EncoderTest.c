@@ -75,7 +75,13 @@ int main()
 		rc_usleep(50000);
 	}
 	printf("\n");
-
+	printf("Memory buffer with A/D reads\n");
+// now print out memory buffer which holds A/D readings
+// use locations [ENCODER_MEM_OFFSET] + 2....129 to hold line scan from A/D
+	for(i = 0; i< 128; i++){
+		printf("%8x ", (int) shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+2+i]); 
+	}
+	printf("\n");
 	rc_encoder_pru_cleanup();
 	return 0;
 }
