@@ -66,16 +66,21 @@ void main(void)
 	
 	// try to access shared memory from C 
 	shared_mem_32bit_ptr = (volatile unsigned int *) PRU_SHAREDMEM;
-	shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+2] = 0x5a5a;
 	
 	init_adc();
+	shared_mem_32bit_ptr[ENCODER_MEM_OFFSET] = 0x0;  // signal to Linux process that PRU is running/ready
+	
 	// atod_value = read_adc(0);  // channels are 0 to 3
 	// shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+2] = atod_value;
 	
-	
-	// use locations [ENCODER_MEM_OFFSET] + 2....129 to hold line scan from A/D
-	for(i = 0; i< 128; i++){
-		shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+2+i] = read_adc(0); 
+	// use location [ENCODER_MEM_OFFSET] + 1 to signal starting to read adc
+	while(1)
+	{	while(shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+1] == 0); // loop until command to read 128 times
+			// use locations [ENCODER_MEM_OFFSET] + 2....129 to hold line scan from A/D
+		for(i = 0; i< 128; i++)
+		{			shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+2+i] = read_adc(0); 
+		}	
+		shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+1] = 0; // reset to zero to indicate read complete
 	}
 	
 	start(); // start assembly language routine
@@ -112,7 +117,7 @@ void init_adc()
 
 	/* 
 	* make sure no step is enabled, until channel is read with read_adc(chan)  
-	disbale TS_CHARGE and Steps 1-16
+	disable TS_CHARGE and Steps 1-16
 	*/
 	ADC_TSC.STEPENABLE = ADC_TSC.STEPENABLE & 0xfffe0000;
 	
@@ -126,7 +131,7 @@ void init_adc()
 	 * use FIFO0
 	 */
 	ADC_TSC.STEPCONFIG1_bit.MODE = 0;
-	ADC_TSC.STEPCONFIG1_bit.AVERAGING = 3;
+	ADC_TSC.STEPCONFIG1_bit.AVERAGING = 0;
 	ADC_TSC.STEPCONFIG1_bit.SEL_INP_SWC_3_0 = 0;
 	ADC_TSC.STEPCONFIG1_bit.FIFO_SELECT = 0;
 
@@ -138,7 +143,7 @@ void init_adc()
 	 * use FIFO0
 	 */
 	ADC_TSC.STEPCONFIG2_bit.MODE = 0;
-	ADC_TSC.STEPCONFIG2_bit.AVERAGING = 3;
+	ADC_TSC.STEPCONFIG2_bit.AVERAGING = 0;
 	ADC_TSC.STEPCONFIG2_bit.SEL_INP_SWC_3_0 = 0;  // chan 0
 	ADC_TSC.STEPCONFIG2_bit.FIFO_SELECT = 0;
 
@@ -150,7 +155,7 @@ void init_adc()
 	 * use FIFO0
 	 */
 	ADC_TSC.STEPCONFIG3_bit.MODE = 0;
-	ADC_TSC.STEPCONFIG3_bit.AVERAGING = 3;
+	ADC_TSC.STEPCONFIG3_bit.AVERAGING = 0;
 	ADC_TSC.STEPCONFIG3_bit.SEL_INP_SWC_3_0 = 0; // chan 0
 	ADC_TSC.STEPCONFIG3_bit.FIFO_SELECT = 0;
 
@@ -162,7 +167,7 @@ void init_adc()
 	 * use FIFO0
 	 */
 	ADC_TSC.STEPCONFIG4_bit.MODE = 0;
-	ADC_TSC.STEPCONFIG4_bit.AVERAGING = 3;
+	ADC_TSC.STEPCONFIG4_bit.AVERAGING = 0;
 	ADC_TSC.STEPCONFIG4_bit.SEL_INP_SWC_3_0 = 0; // chan 0
 	ADC_TSC.STEPCONFIG4_bit.FIFO_SELECT = 0;
 
@@ -190,25 +195,34 @@ uint16_t read_adc(uint16_t adc_chan)
 	for (i = 0; i < count; i++) {
 		data = ADC_TSC.FIFO0DATA;
 	}
-
+	ADC_TSC.STEPENABLE_bit.STEP1 = 1;
+	
 	/* read from the specified ADC channel */
 	/* are these ever disabled? maybe should be set to zero at init time... */
-	switch (adc_chan) {
-		case 0 :
-			ADC_TSC.STEPENABLE_bit.STEP1 = 1;
-		case 1 :
-			ADC_TSC.STEPENABLE_bit.STEP2 = 1;
-		case 2 :
-			ADC_TSC.STEPENABLE_bit.STEP3 = 1;
-		case 3 :
-			ADC_TSC.STEPENABLE_bit.STEP4 = 1;
-		default :
-			/* 
-			 * this error condition should not occur because of
-			 * checks in userspace code
-			 */
-			ADC_TSC.STEPENABLE_bit.STEP1 = 1;
-	}
+	
+	/* **** SWITCH DOES NOT COMPILE CORRECTLY- DO NOT USE !!!!!!!!!!!! */
+	
+	// switch (adc_chan) {
+	// 	case 0 :
+	// 		ADC_TSC.STEPENABLE_bit.STEP1 = 1;
+	// 		break; // break is needed to keep other steps from being enabled
+	// 	case 1 :
+	// 		ADC_TSC.STEPENABLE_bit.STEP2 = 1;
+	// 		break;
+	// 	case 2 :
+	// 		ADC_TSC.STEPENABLE_bit.STEP3 = 1;
+	// 		break;
+	// 	case 3 :
+	// 		ADC_TSC.STEPENABLE_bit.STEP4 = 1;
+	// 		break;
+	// 	default :
+	// 		/* 
+	// 		 * this error condition should not occur because of
+	// 		 * checks in userspace code
+	// 		 */
+	// 		ADC_TSC.STEPENABLE_bit.STEP1 = 1;
+	// 		break;
+	// }
 
 	while (ADC_TSC.FIFO0COUNT == 0) {
 		/*

@@ -40,3 +40,36 @@ Still reads 4 channels...
 Maybe runs anyway?
 
 4. in init_adc(), set each step to point to chan 0.
+==> works to read just channel 0.
+
+5. Speed very low
+AtoD buffer 1e3 reads. Takes: 9,428,088us (this is 9 ms per 128 bytes!)
+
+6. Try removing averaging from A/D read.
+AtoD buffer 1e3 reads. Takes: 6,004,066us (this is 6 ms per 128 bytes!)
+
+7. Is FIFO not empty when first read?
+
+Note: file.map shows address of constants such as PRU_SHAREDMEM
+.text shows start for each function
+                0x00000278    00000094     main_pru0.object (.text:read_adc)
+
+uint32_t count = ADC_TSC.FIFO0COUNT;
+gives count=4, (maybe because each a/d read from step is in FIFO?)
+prudbg break at 
+LBBO      &r0, r1, 228, 4 (loads r0 from ADC_TSC base + 0xe4 = FIFO0COUNT) 
+br 0 0xa0
+
+228=0xe4
+
+switch(adc_chan) is executing all cases????
+missing break!
+
+got 5 reads in FIFO by time it got to 
+while (ADC_TSC.FIFO0COUNT == 0) line
+
+8. switch statement does not compile correctly!
+Recompile to use only channel0!
+
+still quite slow...
+
