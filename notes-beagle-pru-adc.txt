@@ -114,9 +114,13 @@ CH8BIT should be r30_5
 attempting to stop PRU0
 ==>Fixed by rebooting/resetting CPU. Something got wedged???
 
-
+14. How are output pins set for rc_test_servo?
 
 maybe something got set, try reset...
+src/pru/pru.c: int rc_pru_start(int ch, const char* fw_name)
+src/pru/servo.c: calls rc pru start. only GPIO set is for power enable
+
+==> pins may be set by kernel???
 
 
 
