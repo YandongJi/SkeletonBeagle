@@ -42,12 +42,19 @@
 
 #define ENCODER_MEM_OFFSET	16
 #define PRU_SHAREDMEM 0x10000 // shared memory with Cortex A8?
+
+#define CLK (1 << 5)  // should be r30_5, CH8BIT
+#define SI (1 << 4)  // start integration, r30_4, CH7BIT
+
 // pru shared memory pointer
 static volatile unsigned int* shared_mem_32bit_ptr = NULL;
+
+volatile register uint32_t __R30;  // general purpose output register
 
 /* prototypes */
 void init_adc(void);
 uint16_t read_adc(uint16_t);
+
 
 // The function is defined in pru1_asm_blinky.asm in same dir
 // We just need to add a declaration here, the defination can be
@@ -55,14 +62,21 @@ uint16_t read_adc(uint16_t);
 extern void start(void);
 
 void main(void)
-{	int atod_value =0x7779;
+{	// int atod_value =0x7779;
 	int i;
 	/* Clear SYSCFG[STANDBY_INIT] to enable OCP master port */
 	CT_CFG.SYSCFG_bit.STANDBY_INIT = 0;
+	/* Enable OCP Master ports (STANDBY_INIT) */
+	// CT_CFG.SYSCFG_bit.IDLE_MODE =0;
+	// CT_CFG.SYSCFG_bit.STANDBY_MODE =0;
+	// CT_CFG.SYSCFG_bit.SUB_MWAIT =0;
 	
 	// Access PRU Shared RAM using Constant Table                    */
 	// C28 defaults to 0x00000000, we need to set bits 23:8 to 0x0100 in order to have it point to 0x00010000	 */
 	PRU0_CTRL.CTPPR0_bit.C28_BLK_POINTER = 0x0100;
+	
+	__R30 &= ~CLK; // reset CLK
+	__R30 &= ~SI; // reset SI
 	
 	// try to access shared memory from C 
 	shared_mem_32bit_ptr = (volatile unsigned int *) PRU_SHAREDMEM;
@@ -77,14 +91,30 @@ void main(void)
 	while(1)
 	{	while(shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+1] == 0); // loop until command to read 128 times
 			// use locations [ENCODER_MEM_OFFSET] + 2....129 to hold line scan from A/D
+		__R30 |= SI; // set SI	
+		__delay_cycles(10);
+		__R30 |= CLK; // set CLK
+		__delay_cycles(10);
+		__R30 &= ~SI; // reset SI
+		__delay_cycles(10);
+	
+		
 		for(i = 0; i< 128; i++)
-		{			shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+2+i] = read_adc(0); 
+		{ //	__R30 &= ~CLK; // reset CLK line		
+			shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+2+i] = read_adc(0); 
+			__R30 |= CLK; // set CLK
+			__delay_cycles(10); // allow hold time
 		}	
+		__R30 &= ~CLK; // reset CLK line	- this should be clock 129 falling edge
+		
 		shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+1] = 0; // reset to zero to indicate read complete
 	}
 	
-	start(); // start assembly language routine
+	//start(); // start assembly language routine
 }
+
+
+
 
 /* *******************************************************
 */
@@ -134,6 +164,14 @@ void init_adc()
 	ADC_TSC.STEPCONFIG1_bit.AVERAGING = 0;
 	ADC_TSC.STEPCONFIG1_bit.SEL_INP_SWC_3_0 = 0;
 	ADC_TSC.STEPCONFIG1_bit.FIFO_SELECT = 0;
+
+	/* make sure delay is also minimum. This is set to zero at reset, but just in case see if it makes any difference. */
+	/* sped up by factor of 6 by setting to zero. Perhaps it was set by other rc library code being run. 
+	*  Now get 7.9 us per conversion
+	*/
+
+	ADC_TSC.STEPDELAY1_bit.OPENDELAY = 0x0;
+	ADC_TSC.STEPDELAY1_bit.SAMPLEDELAY = 0x0;
 
 	/*
 	 * set the ADC_TSC STEPCONFIG2 register for channel 1

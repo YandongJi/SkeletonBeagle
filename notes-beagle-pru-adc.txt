@@ -73,3 +73,56 @@ Recompile to use only channel0!
 
 still quite slow...
 
+9. Change openDelay and Sample Delay to be 0x01 (should be set by reset to 0)
+   ADC_TSC.STEPDELAY1_bit.OPENDELAY = 0x01;
+   ADC_TSC.STEPDELAY1_bit.SAMPLEDELAY = 0x01;
+AtoD buffer 1e3 reads. Takes: 1085136us
+6X faster.
+
+Changed to delay 16 clock cycles, now 17 us/conversion
+AtoD buffer 1e3 reads. Takes: 2178175us
+
+OPENDELAY = 0x010;  SAMPLEDELAY = 0x0;
+AtoD buffer 1e3 reads. Takes: 1561404us 12.2 us
+
+OPENDELAY = 0x0; SAMPLEDELAY = 0x0;
+AtoD buffer 1e3 reads. Takes: 1018944us 7.9 us
+
+10. Now need to add clock output to drive camera
+Use servo channel 8.
+
+Clear SYSCFG[STANDBY_INIT] to enable OCP master port
+
+how to access this in C so don't need to do initialization in assembly?
+#include <pru_cfg.h>
+CT_CFG.SYSCFG_bit.STANDBY_INIT =0;
+-----------------------
+11.  How to access r30 from c language?
+/usr/lib/ti/pru-software-support-package/examples/am335x
+__r30
+
+c programming manual
+http://www.ti.com/lit/ug/spruhv7b/spruhv7b.pdf
+5.7.2 Global Register Variables
+
+CH8BIT should be r30_5
+
+12. setting delay using: __delay_cycles(100000000);?
+
+
+13. ERROR in rc_encoder_pru_init, am335x-pru0-rc-encoder-fw failed to load
+attempting to stop PRU0
+==>Fixed by rebooting/resetting CPU. Something got wedged???
+
+
+
+maybe something got set, try reset...
+
+
+
+but will also need to set GP output, e.g. from rc_test_servo...
+
+compiler option:
+--absolute_listing
+Generates a listing with absolute addresses rather than section-relative.
+
