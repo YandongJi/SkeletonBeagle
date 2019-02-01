@@ -122,7 +122,21 @@ src/pru/servo.c: calls rc pru start. only GPIO set is for power enable
 
 ==> pins may be set by kernel???
 
+config-pin $pin pruout
+config-pin -q $pin
+config-pin -i P8_27
 
+The internal pinmuxing is programmable through the PIN_MX 
+
+union {
+                volatile uint32_t PIN_MX;
+
+                volatile struct {
+                        unsigned PIN_MUX_SEL : 8;       // 7:0
+                        unsigned rsvd2 : 24;            // 31:8
+                } PIN_MX_bit;
+        };      //0x40
+} pruCfg;
 
 but will also need to set GP output, e.g. from rc_test_servo...
 
@@ -130,3 +144,4 @@ compiler option:
 --absolute_listing
 Generates a listing with absolute addresses rather than section-relative.
 
+15. 
