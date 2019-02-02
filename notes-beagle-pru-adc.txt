@@ -126,6 +126,9 @@ config-pin $pin pruout
 config-pin -q $pin
 config-pin -i P8_27
 
+What is actual list of available pins?
+/sys/devices/platform/ocp/ (these seem to be for Beaglebon Black)
+
 The internal pinmuxing is programmable through the PIN_MX 
 
 union {
@@ -144,4 +147,4 @@ compiler option:
 --absolute_listing
 Generates a listing with absolute addresses rather than section-relative.
 
-15. 
+15. see if can drive an LED from servo output through PRU
