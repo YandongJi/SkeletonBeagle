@@ -43,6 +43,21 @@
 #define ENCODER_MEM_OFFSET	16
 #define PRU_SHAREDMEM 0x10000 // shared memory with Cortex A8?
 
+#define GPIO1 0x4804C000
+#define GPIO_CLEARDATAOUT 0x190
+#define GPIO_SETDATAOUT 0x194
+#define USR0 (1<<21)
+#define USR1 (1<<22)
+#define USR2 (1<<23)
+#define USR3 (1<<24)
+unsigned int volatile * const GPIO1_CLEAR = (unsigned int *) (GPIO1 + GPIO_CLEARDATAOUT);
+unsigned int volatile * const GPIO1_SET   = (unsigned int *) (GPIO1 + GPIO_SETDATAOUT);
+
+
+/* shared pins are controlled by pinmux and kernel level process/device drivers.
+* try to write directly to ouput port, using pins already defined as output
+*/
+
 #define CLK (1 << 5)  // should be r30_5, CH8BIT
 #define SI (1 << 4)  // start integration, r30_4, CH7BIT
 
@@ -97,7 +112,7 @@ void main(void)
 		__delay_cycles(10);
 		__R30 &= ~SI; // reset SI
 		__delay_cycles(10);
-	
+		*GPIO1_SET = USR3 | USR2 |USR1 | USR0;      // Turn the USR3..0 LEDs on
 		
 		for(i = 0; i< 128; i++)
 		{ //	__R30 &= ~CLK; // reset CLK line		
@@ -108,6 +123,7 @@ void main(void)
 		__R30 &= ~CLK; // reset CLK line	- this should be clock 129 falling edge
 		
 		shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+1] = 0; // reset to zero to indicate read complete
+		*GPIO1_CLEAR = USR3 | USR2 |USR1 | USR0;      // Turn the USR3..0 LEDs on
 	}
 	
 	//start(); // start assembly language routine

@@ -124,13 +124,62 @@ src/pru/servo.c: calls rc pru start. only GPIO set is for power enable
 
 config-pin $pin pruout
 config-pin -q $pin
-config-pin -i P8_27
+config-pin -i P8_27 or config-pin -i P8.27 or config-pin -i P8-27
+
 
 What is actual list of available pins?
 /sys/devices/platform/ocp/ (these seem to be for Beaglebon Black)
 
-The internal pinmuxing is programmable through the PIN_MX 
 
+
+Looks like 2 separate r30 output registers, one for each PRU. Set by GPIO mode, not PRU select.
+
+but will also need to set GP output, e.g. from rc_test_servo...
+
+compiler option:
+--absolute_listing
+Generates a listing with absolute addresses rather than section-relative.
+
+16. R30 output register PRU0_R30 has different pins than PRU1_R30. Some missing on Beaglebone spreadsheet.
+
+To see configuration of pins:
+ https://github.com/mvduin/bbb-pin-utils
+ sudo ./show-pins
+ sudo ./show-pins | grep pru
+ 
+15. see if can drive an LED from servo output through PRU
+QEP_3A = P8.12 = pru_30_14
+sudo config-pin P8.12 pruout 
+P8_12 pinmux file not found!
+bash: /sys/devices/platform/ocp/ocp*P8_12_pinmux/state: No such file or directory
+Does the device need to be enabled at boot time?
+
+Maybe have to use PRU1- ipns all set up
+ocp/helper?
+/sys/devices/platform/ocp/ocp:helper$
+rc_pinmux_set()?
+
+How to mode on a pin? rc_pinmux_set has only limited modes...
+and modes are set through device driver...
+
+May have to use PRU1?
+
+Or can PRU write directly to a GPIO that is already setup as an output?
+(Without going through R30?
+
+#define GPIO1 0x4804C000
+
+16. pru0 code is not the new C file, but the old version. Why did it not install with sudo make install?
+Old files in build directory, erased, now get linking errors
+
+not building object files for some reason?
+DON't USE ABSOLUTE LISTING IN MAKEFILE #--absolute_listing won't make .object files
+
+
+
+------------------------
+NOT NEEDED
+The internal pinmuxing is programmable through the PIN_MX 
 union {
                 volatile uint32_t PIN_MX;
 
@@ -141,10 +190,5 @@ union {
         };      //0x40
 } pruCfg;
 
-but will also need to set GP output, e.g. from rc_test_servo...
-
-compiler option:
---absolute_listing
-Generates a listing with absolute addresses rather than section-relative.
-
-15. see if can drive an LED from servo output through PRU
+pin_mux_sel[1]==> pru0_pru_r30[13:8] = pru_r30[5:0]
+else just pru_r30[113:8]
