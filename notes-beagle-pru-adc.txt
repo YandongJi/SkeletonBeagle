@@ -128,7 +128,7 @@ config-pin -i P8_27 or config-pin -i P8.27 or config-pin -i P8-27
 
 
 What is actual list of available pins?
-/sys/devices/platform/ocp/ (these seem to be for Beaglebon Black)
+/sys/devices/platform/ocp/ (these seem to be for Beaglebone Black)
 
 
 
@@ -175,6 +175,29 @@ Old files in build directory, erased, now get linking errors
 not building object files for some reason?
 DON't USE ABSOLUTE LISTING IN MAKEFILE #--absolute_listing won't make .object files
 
+17. GPIO1 works to blink onboard LEDS. Pinmux was already set for these pins.
+How to use pinmux directly to setup 
+output bits for SI and CLK?
+Need to use Once Chip Peripheral OCP?
+
+9.2.2 Pad Control Registers
+9.2.2.1 Mode Selection
+Table 9-60. conf_<module>_<pin> Register Field Descriptions
+offset 984h conf_uart1_txd
+offset 980h conf_uart1_rxd
+9.3.1.50 conf_<module>_<pin> Register (offset = 800h–A34h)
+
+maybe use:
+config-pin -i P9.26? for gpio0[14]
+and 
+config-pin P9.24 for gpio[15]?
+
+(pins are probably avail from rc, but would be nice to initialize from PRU?)
+
+dt-bindings/pinctrl/am33xx.h
+/opt/source/dtb-4.14-ti/include/dt-bindings
+/opt/source/dtb-4.14-ti/include/dt-bindings/pinctrl/omap.h
+#define AM33XX_IOPAD(pa, val)           OMAP_IOPAD_OFFSET((pa), 0x0800) (val)
 
 
 ------------------------
