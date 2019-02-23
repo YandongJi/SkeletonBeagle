@@ -9,6 +9,10 @@
 #include <robotcontrol.h> // includes ALL Robot Control subsystems
 #include <rc/pinmux.h>
 
+// this should give use GPIO0 port at 
+// /sys/devices/platform/ocp/44e07000.gpio/gpio/gpiochip0
+#define CHIP 0 
+
 // function declarations
 void on_pause_press();
 void on_pause_release();
@@ -66,8 +70,13 @@ int main()
 	// setup SI and CLK pins for output
 	if (rc_pinmux_set(pin1, PINMUX_GPIO) == -1)
 		{printf("Failed to set pin %d", pin1); }
-		if (rc_pinmux_set(pin2, PINMUX_GPIO) == -1)
+	if(rc_gpio_init (CHIP, pin1, GPIOHANDLE_REQUEST_OUTPUT) ==-1)
+		{printf("Failed to init gpio pin %d", pin1); }
+	
+	if (rc_pinmux_set(pin2, PINMUX_GPIO) == -1)
 		{printf("Failed to set pin %d", pin2); }
+	if(rc_gpio_init (CHIP, pin2, GPIOHANDLE_REQUEST_OUTPUT) ==-1)
+		{printf("Failed to init gpio pin %d", pin2); }
 	
 	//rc_gpio_init ( 	int  	chip,		int  	pin,	int  	handle_flags	); 		
 	while(rc_get_state()!=EXITING){
@@ -75,10 +84,14 @@ int main()
 		if(rc_get_state()==RUNNING){
 			rc_led_set(RC_LED_GREEN, 1);
 			rc_led_set(RC_LED_RED, 0);
+			rc_gpio_set_value 	(CHIP, pin1, 0);
+			rc_gpio_set_value 	(CHIP, pin2, 1);
 		}
 		else{
 			rc_led_set(RC_LED_GREEN, 0);
 			rc_led_set(RC_LED_RED, 1);
+			rc_gpio_set_value 	(CHIP, pin1, 1);
+			rc_gpio_set_value 	(CHIP, pin2, 0);
 		}
 		// always sleep at some point
 		rc_usleep(100000);

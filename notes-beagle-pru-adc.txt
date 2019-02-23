@@ -178,6 +178,23 @@ DON't USE ABSOLUTE LISTING IN MAKEFILE #--absolute_listing won't make .object fi
 17. GPIO1 works to blink onboard LEDS. Pinmux was already set for these pins.
 How to use pinmux directly to setup 
 output bits for SI and CLK?
+Use rc_pinmux_set/rc_gpio_init 
+
+What is gpiochip? gpio0 corresponds to gpiochip0
+0x44e07000 = GPIO0
+
+/sys/devices/platform/ocp/44e07000.gpio/gpio/gpiochip0
+/sys/devices/platform/ocp/4804c000.gpio/gpio/gpiochip32
+/sys/devices/platform/ocp/481ac000.gpio/gpio/gpiochip64
+/sys/devices/platform/ocp/481ae000.gpio/gpio/gpiochip96
+
+
+
+
+
+
+
+---------------------------------------------
 Need to use Once Chip Peripheral OCP?
 
 9.2.2 Pad Control Registers
