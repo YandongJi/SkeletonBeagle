@@ -78,7 +78,7 @@ int main()
 	for(i = 0; i < 1000000; i++)
 	{  value = value + rc_encoder_pru_read();
 	}
-	end_time = rc_nanos_thread_time();
+	end_time = rc_nanos_since_boot();
 	run_time = end_time - start_time;
 	printf("Encoder 1e6 reads. Total = %ld. Takes: %" PRIu64 "us\n",value, run_time/1000);
 
@@ -99,17 +99,19 @@ int main()
 //	}
 
 	printf("\n");
-	start_time = rc_nanos_thread_time();
-	for(j = 0; j< 1000; j++)
+	start_time = rc_nanos_since_boot();
+	for(j = 0; j< 100; j++)
 	{	shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+1] = 1; // set flag to start conversion by PRU
 		while(shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+1] == 1); // wait for PRU to zero word
 		for(i = 0; i< 128; i++){
 			linescan[i] = (int) shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+2+i]; // copy data
 		}
+		rc_usleep(5000); // allow 50 ms for exposure before reading out camera
 	}
-	end_time = rc_nanos_thread_time();
+	end_time = rc_nanos_since_boot();
 	run_time = end_time - start_time;
-	printf("AtoD buffer 1e3 reads. Takes: %" PRIu64 "us\n", run_time/1000);
+	printf("End_time %" PRIu64 " start_time %" PRIu64 "\n", end_time, start_time);
+	printf("AtoD buffer 1e2 reads. Takes: %" PRIu64 "us\n", run_time/1000);
 	
 	printf("Memory buffer with A/D reads\n");
 // now print out memory buffer which holds A/D readings

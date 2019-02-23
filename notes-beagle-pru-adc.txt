@@ -191,6 +191,15 @@ What is gpiochip? gpio0 corresponds to gpiochip0
 17. Need to have pinmux inside running code, else pin defaults back to previous function?
 Yes- so pinmux and gpioinit added to AtoD test.
 
+18. try adding delay to get more exposure?
+Does arithmetic work on uint64_t?
+rc_nanos_thread_time()  only updates in thread. Should use 
+rc_nanos_since_boot() instead
+
+AtoD buffer 1e2 reads. Takes: 119213us
+add 5 ms delay, AtoD buffer 1e2 reads. Takes: 642209us
+
+Is only getting values of 6 to 7 on A/D read. Need to check with oscope.
 
 
 
