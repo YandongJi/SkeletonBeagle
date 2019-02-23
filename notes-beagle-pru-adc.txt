@@ -188,6 +188,10 @@ What is gpiochip? gpio0 corresponds to gpiochip0
 /sys/devices/platform/ocp/481ac000.gpio/gpio/gpiochip64
 /sys/devices/platform/ocp/481ae000.gpio/gpio/gpiochip96
 
+17. Need to have pinmux inside running code, else pin defaults back to previous function?
+Yes- so pinmux and gpioinit added to AtoD test.
+
+
 
 
 

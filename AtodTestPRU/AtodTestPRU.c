@@ -15,6 +15,12 @@
 #include <rc/time.h>
 #include <rc/pru.h>
 
+#include <robotcontrol.h> // includes ALL Robot Control subsystems
+#include <rc/pinmux.h>
+// this should give use GPIO0 port at 
+// /sys/devices/platform/ocp/44e07000.gpio/gpio/gpiochip0
+#define CHIP 0 
+
 #define ENCODER_MEM_OFFSET	16
 
 // pru shared memory pointer
@@ -37,6 +43,8 @@ static void __signal_handler(__attribute__ ((unused)) int dummy)
 int main()
 {	long value = 0;
 	long i, j;
+	int pin1 = UART1_HEADER_PIN_3;	///< P9_26, normally UART1 RX
+	int pin2 = UART1_HEADER_PIN_4;	///< P9_24, normally UART1 TX
 	
 	int linescan[128]; // array to hold line scan data
 	
@@ -45,6 +53,18 @@ int main()
 		fprintf(stderr,"ERROR: failed to run rc_encoder_pru_init\n");
 		return -1;
 	}
+	
+// setup SI and CLK pins for output
+	if (rc_pinmux_set(pin1, PINMUX_GPIO) == -1)
+		{printf("Failed to set pin %d", pin1); }
+	if(rc_gpio_init (CHIP, pin1, GPIOHANDLE_REQUEST_OUTPUT) ==-1)
+		{printf("Failed to init gpio pin %d", pin1); }
+	
+	if (rc_pinmux_set(pin2, PINMUX_GPIO) == -1)
+		{printf("Failed to set pin %d", pin2); }
+	if(rc_gpio_init (CHIP, pin2, GPIOHANDLE_REQUEST_OUTPUT) ==-1)
+		{printf("Failed to init gpio pin %d", pin2); }
+	
 
 	// set signal handler so the loop can exit cleanly
 	signal(SIGINT, __signal_handler);

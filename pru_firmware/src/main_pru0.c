@@ -43,9 +43,18 @@
 #define ENCODER_MEM_OFFSET	16
 #define PRU_SHAREDMEM 0x10000 // shared memory with Cortex A8?
 
-#define GPIO1 0x4804C000
 #define GPIO_CLEARDATAOUT 0x190
 #define GPIO_SETDATAOUT 0x194
+
+#define GPIO0 0x44e07000
+// gpio[15] = TSL1401 clock
+#define CLK (1 << 15)  
+// gpio[14] = start integration
+#define SI (1 << 14) 
+unsigned int volatile * const GPIO0_CLEAR = (unsigned int *) (GPIO0 + GPIO_CLEARDATAOUT);
+unsigned int volatile * const GPIO0_SET   = (unsigned int *) (GPIO0 + GPIO_SETDATAOUT);
+
+#define GPIO1 0x4804C000
 #define USR0 (1<<21)
 #define USR1 (1<<22)
 #define USR2 (1<<23)
@@ -58,8 +67,8 @@ unsigned int volatile * const GPIO1_SET   = (unsigned int *) (GPIO1 + GPIO_SETDA
 * try to write directly to ouput port, using pins already defined as output
 */
 
-#define CLK (1 << 5)  // should be r30_5, CH8BIT
-#define SI (1 << 4)  // start integration, r30_4, CH7BIT
+//#define CLK (1 << 5)  // should be r30_5, CH8BIT
+//#define SI (1 << 4)  // start integration, r30_4, CH7BIT
 
 // pru shared memory pointer
 static volatile unsigned int* shared_mem_32bit_ptr = NULL;
@@ -90,8 +99,9 @@ void main(void)
 	// C28 defaults to 0x00000000, we need to set bits 23:8 to 0x0100 in order to have it point to 0x00010000	 */
 	PRU0_CTRL.CTPPR0_bit.C28_BLK_POINTER = 0x0100;
 	
-	__R30 &= ~CLK; // reset CLK
-	__R30 &= ~SI; // reset SI
+	*GPIO0_CLEAR = CLK | SI ; // reset CLK and SI
+	// __R30 &= ~CLK; // reset CLK
+	// __R30 &= ~SI; // reset SI
 	
 	// try to access shared memory from C 
 	shared_mem_32bit_ptr = (volatile unsigned int *) PRU_SHAREDMEM;
@@ -106,21 +116,30 @@ void main(void)
 	while(1)
 	{	while(shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+1] == 0); // loop until command to read 128 times
 			// use locations [ENCODER_MEM_OFFSET] + 2....129 to hold line scan from A/D
-		__R30 |= SI; // set SI	
+		*GPIO0_SET =  SI ; // set SI
 		__delay_cycles(10);
-		__R30 |= CLK; // set CLK
+		*GPIO0_SET = CLK; // set CLK. This rising edge gives first pixel
 		__delay_cycles(10);
-		__R30 &= ~SI; // reset SI
+		*GPIO0_CLEAR = SI; // reset SI
 		__delay_cycles(10);
+		
+		
+		// __R30 |= SI; // set SI	
+		// __delay_cycles(10);
+		// __R30 |= CLK; // set CLK
+		// __delay_cycles(10);
+		// __R30 &= ~SI; // reset SI
+		// __delay_cycles(10);
 		*GPIO1_SET = USR3 | USR2 |USR1 | USR0;      // Turn the USR3..0 LEDs on
 		
 		for(i = 0; i< 128; i++)
-		{ //	__R30 &= ~CLK; // reset CLK line		
+		{ 	*GPIO0_CLEAR = CLK; //  reset CLK line	
 			shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+2+i] = read_adc(0); 
-			__R30 |= CLK; // set CLK
+			*GPIO0_SET = CLK; // set CLK. This rising edge gives next pixel
 			__delay_cycles(10); // allow hold time
 		}	
-		__R30 &= ~CLK; // reset CLK line	- this should be clock 129 falling edge
+		*GPIO0_CLEAR = CLK; // reset CLK line	- this should be clock 129 falling edge
+	
 		
 		shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+1] = 0; // reset to zero to indicate read complete
 		*GPIO1_CLEAR = USR3 | USR2 |USR1 | USR0;      // Turn the USR3..0 LEDs on
