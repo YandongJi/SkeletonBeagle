@@ -190,14 +190,25 @@ What is gpiochip? gpio0 corresponds to gpiochip0
 
 https://www.elinux.org/CI20_GPIO_LED_Blink_Tutorial
 
+17. Need to have pinmux inside running code, else pin defaults back to previous function?
+Yes- so pinmux and gpioinit added to AtoD test.
 
-18. any utility to slow slew mode?
+18. try adding delay to get more exposure?
+Does arithmetic work on uint64_t?
+rc_nanos_thread_time()  only updates in thread. Should use 
+rc_nanos_since_boot() instead
+
+
+AtoD buffer 1e2 reads. Takes: 119213us
+add 5 ms delay, AtoD buffer 1e2 reads. Takes: 642209us
+
+19. any utility to slow slew mode?
 https://e2e.ti.com/support/processors/f/791/t/233997?AM335x-Slow-Slew-Rate
 ``We also determined the IO cells used in AM335x were not providing any significant change in slew rate. 
 Therefore, there wasn't any value in characterizing the device while operating in slow mode.''
 
 
-19. more details on GPIO
+20. more details on GPIO
 http://derekmolloy.ie/gpios-on-the-beaglebone-black-using-device-tree-overlays/
 
 ---------------------------------------------
