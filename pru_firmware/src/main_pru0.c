@@ -73,16 +73,16 @@ unsigned int volatile * const GPIO1_SET   = (unsigned int *) (GPIO1 + GPIO_SETDA
 // pru shared memory pointer
 static volatile unsigned int* shared_mem_32bit_ptr = NULL;
 
-volatile register uint32_t __R30;  // general purpose output register
+//volatile register uint32_t __R30;  // general purpose output register
 
 /* prototypes */
 void init_adc(void);
 uint16_t read_adc(uint16_t);
 
 
-// The function is defined in pru1_asm_blinky.asm in same dir
-// We just need to add a declaration here, the defination can be
-// seperately linked
+// The function is defined in pru0-encodery.asm in same dir
+// We just need to add a declaration here, the definition can be
+// separately linked
 extern void start(void);
 
 void main(void)
@@ -124,12 +124,6 @@ void main(void)
 		__delay_cycles(200);
 		
 		
-		// __R30 |= SI; // set SI	
-		// __delay_cycles(10);
-		// __R30 |= CLK; // set CLK
-		// __delay_cycles(10);
-		// __R30 &= ~SI; // reset SI
-		// __delay_cycles(10);
 		*GPIO1_SET = USR3 | USR2 |USR1 | USR0;      // Turn the USR3..0 LEDs on
 	// ok to have a few extra clocks- should just be HiZ read	
 		for(i = 0; i< 130; i++)
@@ -145,7 +139,7 @@ void main(void)
 		*GPIO1_CLEAR = USR3 | USR2 |USR1 | USR0;      // Turn the USR3..0 LEDs on
 	}
 	
-	//start(); // start assembly language routine
+	//start(); // start assembly language routine if there is one
 }
 
 
