@@ -117,11 +117,11 @@ void main(void)
 	{	while(shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+1] == 0); // loop until command to read 128 times
 			// use locations [ENCODER_MEM_OFFSET] + 2....129 to hold line scan from A/D
 		*GPIO0_SET =  SI ; // set SI
-		__delay_cycles(10);
+		__delay_cycles(200);
 		*GPIO0_SET = CLK; // set CLK. This rising edge gives first pixel
-		__delay_cycles(10);
+		__delay_cycles(200);
 		*GPIO0_CLEAR = SI; // reset SI
-		__delay_cycles(10);
+		__delay_cycles(200);
 		
 		
 		// __R30 |= SI; // set SI	
@@ -131,12 +131,12 @@ void main(void)
 		// __R30 &= ~SI; // reset SI
 		// __delay_cycles(10);
 		*GPIO1_SET = USR3 | USR2 |USR1 | USR0;      // Turn the USR3..0 LEDs on
-		
-		for(i = 0; i< 128; i++)
+	// ok to have a few extra clocks- should just be HiZ read	
+		for(i = 0; i< 130; i++)
 		{ 	*GPIO0_CLEAR = CLK; //  reset CLK line	
 			shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+2+i] = read_adc(0); 
 			*GPIO0_SET = CLK; // set CLK. This rising edge gives next pixel
-			__delay_cycles(10); // allow hold time
+			__delay_cycles(200); // allow hold time - 1 us, with ~8 us for A/D
 		}	
 		*GPIO0_CLEAR = CLK; // reset CLK line	- this should be clock 129 falling edge
 	
