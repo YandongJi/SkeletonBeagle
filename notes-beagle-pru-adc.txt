@@ -188,11 +188,17 @@ What is gpiochip? gpio0 corresponds to gpiochip0
 /sys/devices/platform/ocp/481ac000.gpio/gpio/gpiochip64
 /sys/devices/platform/ocp/481ae000.gpio/gpio/gpiochip96
 
+https://www.elinux.org/CI20_GPIO_LED_Blink_Tutorial
 
 
+18. any utility to slow slew mode?
+https://e2e.ti.com/support/processors/f/791/t/233997?AM335x-Slow-Slew-Rate
+``We also determined the IO cells used in AM335x were not providing any significant change in slew rate. 
+Therefore, there wasn't any value in characterizing the device while operating in slow mode.''
 
 
-
+19. more details on GPIO
+http://derekmolloy.ie/gpios-on-the-beaglebone-black-using-device-tree-overlays/
 
 ---------------------------------------------
 Need to use Once Chip Peripheral OCP?
