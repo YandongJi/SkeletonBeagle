@@ -47,10 +47,10 @@
 #define GPIO_SETDATAOUT 0x194
 
 #define GPIO0 0x44e07000
-// gpio[15] = TSL1401 clock
-#define CLK (1 << 15)  
-// gpio[14] = start integration
-#define SI (1 << 14) 
+// gpio[14] = TSL1401 clock, UART1_RX
+#define CLK (1 << 14)  
+// gpio[15] = start integration, UART1_TX
+#define SI (1 << 15) 
 unsigned int volatile * const GPIO0_CLEAR = (unsigned int *) (GPIO0 + GPIO_CLEARDATAOUT);
 unsigned int volatile * const GPIO0_SET   = (unsigned int *) (GPIO0 + GPIO_SETDATAOUT);
 
