@@ -27,8 +27,11 @@ static volatile unsigned int* shared_mem_32bit_ptr = NULL;
 // global variables
 // Must be declared static so they get zero initalized
 static uint64_t start_time, end_time, run_time;
-
+int linescan[128]; // array to hold line scan data
 static int running = 0;
+
+// prototypes
+void log_scan(uint64_t, FILE*);
 
 // interrupt handler to catch ctrl-c
 static void __signal_handler(__attribute__ ((unused)) int dummy)
@@ -42,8 +45,11 @@ int main()
 {	long i, j;
 	int pin1 = UART1_HEADER_PIN_3;	///< P9_26, normally UART1 RX
 	int pin2 = UART1_HEADER_PIN_4;	///< P9_24, normally UART1 TX
+	int num_scans;
+	FILE *fp;
+	char filename[80]; // should bound check
 	
-	int linescan[128]; // array to hold line scan data
+
 	
 	printf("LineScan camera test. Using Debian and PRU, not working with Ubuntu. \n");
 	printf("Make sure pru_firmware is installed. v1.00 2/27/2019\n");
@@ -80,15 +86,27 @@ int main()
 		return -1;
 	} 
 	printf("Initialization Complete\n");
+	printf("How many scans:");
+	scanf("%d", &num_scans);
+	printf("Doing %d scans\n", num_scans);
+	strcpy(filename, "linescans.csv");
+	printf("Opening file %s for writing\n", filename);
+	fp = fopen(filename,"w");
+	if ( fp == NULL)
+	{ printf("can't open file %s  \n", filename);
+          return(-1);
+	}
+	fprintf(fp,"time (ms), linecsan, velocity\n");
 	
 	start_time = rc_nanos_since_boot();
-	for(j = 0; j< 1000; j++)
+	for(j = 0; j< num_scans; j++)
 	{	shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+1] = 1; // set flag to start conversion by PRU
 		while(shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+1] == 1); // wait for PRU to zero word
 		for(i = 0; i< 128; i++){
 			linescan[i] = (int) shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+2+i]; // copy data
 		}
-		rc_usleep(5000); // allow 5 ms for exposure before reading out camera
+		log_scan(start_time, fp); // log the scan to file
+		rc_usleep(5000); // allow 5 ms for exposure before reading out camera. Minimum exposure (with 0 usleep) will be set by 8us A/D read, so about 1 ms.
 	}
 	end_time = rc_nanos_since_boot();
 	run_time = end_time - start_time;
@@ -103,7 +121,22 @@ int main()
 		printf("%8x ", linescan[i]); 
 	}
 	printf("\n");
+	fclose(fp);
 	rc_encoder_pru_cleanup();  // should shut down PRU, maybe release A/D?
 	return 0;
 }
 
+void log_scan(uint64_t start_time, FILE *fp)
+{ uint64_t present_time, elapsed_time;
+  int i;
+  present_time = rc_nanos_since_boot();
+  elapsed_time = (present_time - start_time)/1e6;
+  fprintf(fp,"%" PRIu64 ", ", elapsed_time);
+  fprintf(fp,"\"[");
+  for(i=0; i< 128; i++)
+	fprintf(fp,"%d,", linescan[i]);
+  fprintf(fp,"]\", ");
+  fprintf(fp," 0\n"); // velocity in m/s
+  return;
+}
+  
