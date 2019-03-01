@@ -28,7 +28,13 @@ static volatile unsigned int* shared_mem_32bit_ptr = NULL;
 // global variables
 // Must be declared static so they get zero initalized
 static uint64_t start_time, end_time, run_time;
-int linescan[128][2000]; // array to hold line scan data
+
+// structure to hold line scan data
+struct telem_struct {
+	int time_ms;
+	int linescan[128];
+	};
+struct telem_struct telemdata[2000]; // statically define. malloc is risky in embedded applications
 static int running = 0;
 
 // prototypes
@@ -36,10 +42,8 @@ void log_scan(int, FILE*);
 
 // interrupt handler to catch ctrl-c
 static void __signal_handler(__attribute__ ((unused)) int dummy)
-{
-	running=0;
-	return;
-}
+{	running=0;
+	return; }
 
 
 int main()
@@ -49,20 +53,16 @@ int main()
 	int num_scans;
 	FILE *fp;
 	char filename[80]; // should bound check
-	
 
-	
 	printf("LineScan camera test. Using Debian and PRU, not working with Ubuntu. \n");
 	printf("Make sure pru_firmware is installed. v1.00 2/27/2019\n");
-	
 	
 	// initialize PRU hardware first
 	// rc_encoder_pru_init sets up several things, checks that PRU is running
 	// could be cleaned up later.
 	if(rc_encoder_pru_init()){
 		fprintf(stderr,"ERROR: failed to run rc_encoder_pru_init\n");
-		return -1;
-	}
+		return -1;	}
 	
 // setup SI and CLK pins for output
 	if (rc_pinmux_set(pin1, PINMUX_GPIO) == -1)
@@ -84,8 +84,8 @@ int main()
 	shared_mem_32bit_ptr = rc_pru_shared_mem_ptr();
 	if(shared_mem_32bit_ptr==NULL){
 		fprintf(stderr, "ERROR in rc_encoder_pru_init, failed to map shared memory pointer\n");
-		return -1;
-	} 
+		return -1;	} 
+		
 	printf("Initialization Complete\n");
 	printf("How many scans (2000 max):");
 	scanf("%d", &num_scans);
@@ -110,27 +110,32 @@ int main()
 	for(j = 0; j< num_scans; j++)
 	{	shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+1] = 1; // set flag to start conversion by PRU
 		while(shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+1] == 1); // wait for PRU to zero word
-		for(i = 0; i< 128; i++){
-			linescan[i][j] = (int) shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+2+i]; // copy data
+		
+		end_time = rc_nanos_since_boot();
+		run_time = end_time - start_time; // get time increment since starting scans
+		telemdata[j].time_ms = (int) (run_time/1e3); // convert ns to us
+		
+		for(i = 0; i< 128; i++)
+		{			telemdata[j].linescan[i] = (int) shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+2+i]; // copy data
 		}
-//		log_scan(start_time, fp); // log the scan to file -- this takes 1 ms per line (slow printf?)
-		rc_usleep(100); // allow 1 ms for exposure before reading out camera. Minimum exposure (with 0 usleep) will be set by 8us A/D read, so about 1 ms.
+
+		rc_usleep(100); // allow 0.1 ms for exposure before reading out camera. Minimum exposure (with 0 usleep) will be set by 8us A/D read, so about 1 ms.
 	}
 	end_time = rc_nanos_since_boot();
 	run_time = end_time - start_time;
 	printf("End_time %" PRIu64 " start_time %" PRIu64 "\n", end_time, start_time);
-	printf("AtoD buffer %d reads. Each takes: %" PRIu64 "us\n", num_scans, (run_time/1000)/num_scans);
+	printf("AtoD buffer %d reads. Each scan takes: %" PRIu64 "us\n", num_scans, (run_time/1000)/num_scans);
 	log_scan(num_scans, fp); // log the scan to file -- this takes 1 ms per line (slow printf?)
-	printf("Memory buffer with A/D reads\n");
+	
+	
 // now print out memory buffer which holds A/D readings
 // use locations [ENCODER_MEM_OFFSET] + 2....129 to hold line scan from A/D
-	for(i = 0; i< 128; i++){
-		// printf("%8x ", (int) shared_mem_32bit_ptr[ENCODER_MEM_OFFSET+2+i]); 
-		printf("%8x ", linescan[i][num_scans-1]); 
-	}
+	printf("Memory buffer with A/D reads\n");
+	for(i = 0; i< 128; i++)
+	{ printf("%8x ", telemdata[num_scans-1].linescan[i]); }
 	printf("\n");
 	fclose(fp);
-	// free(linescan); // release memory
+
 	rc_encoder_pru_cleanup();  // should shut down PRU, maybe release A/D?
 	return 0;
 }
@@ -141,11 +146,12 @@ void log_scan(int num_scans, FILE *fp)
   
   for(j = 0; j< num_scans; j++)
   {
-	  fprintf(fp,"%d,",j); // just index, would be nice to have time stamp 
+  	  fprintf(fp,"%d,",telemdata[j].time_ms); // just index, would be nice to have time stamp 
 	  fprintf(fp,"\"[");
 	  for(i=0; i< 127; i++)
-		fprintf(fp,"%d,", linescan[i][j]);
-	  fprintf(fp," %d", linescan[127][j]); //end data without comma
+	  {	fprintf(fp,"%d,", telemdata[j].linescan[i]); }
+	  
+	  fprintf(fp," %d", telemdata[j].linescan[127]); //end data without comma
 	  fprintf(fp,"]\", ");
 	  fprintf(fp," 0\n"); // velocity in m/s
   }
