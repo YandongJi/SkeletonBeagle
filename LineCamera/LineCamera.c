@@ -104,7 +104,7 @@ int main()
 	{ printf("can't open file %s  \n", filename);
           return(-1);
 	}
-	fprintf(fp,"time (ms), linescan_near, velocity\n");
+	fprintf(fp,"time (us), linescan_near, velocity\n");
 	
 	start_time = rc_nanos_since_boot();
 	
