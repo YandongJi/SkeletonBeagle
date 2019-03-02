@@ -10,6 +10,7 @@
 #include <signal.h>
 #include <inttypes.h> // for PRIu64
 #include <stdlib.h> // for malloc
+#include <time.h> // for date/time
 #include <rc/encoder_pru.h>
 #include <rc/time.h>
 #include <rc/pru.h>
@@ -90,9 +91,13 @@ int main()
 	printf("How many scans (2000 max):");
 	scanf("%d", &num_scans);
 	printf("Doing %d scans\n", num_scans);
-//	linescan = malloc(num_scans*128*sizeof(int));
+
 	
-	strcpy(filename, "linescans.csv");
+	time_t t = time(NULL);
+	struct tm tm_struct = *localtime(&t);
+	snprintf(filename, sizeof("linescans-1999-12-31-23:59:59.csv"), "linescans.%d%02d%02d-%02d%02d%02d.csv", 
+			tm_struct.tm_year + 1900, tm_struct.tm_mon + 1, tm_struct.tm_mday, tm_struct.tm_hour, tm_struct.tm_min, tm_struct.tm_sec);
+	// strcpy(filename, "linescans.csv");
 	printf("Opening file %s for writing\n", filename);
 	fp = fopen(filename,"w");
 	if ( fp == NULL)
