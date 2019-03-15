@@ -6,4 +6,15 @@ Is variation less when not running Cloud9?
 
 avahi-daemon is using lost of cycles?
 
+https://www.tldp.org/HOWTO/Security-Quickstart-HOWTO/services.html
+netstat -tap |grep LISTEN.
+
+not running cloud9
+htop for 11 hours: TIME+
+rc_battery_monitor: 1:05.41
+/usr/sbin/apache2 -k start: 4 processes, each at 0:31.95
+sshd: debian@pts/4: 0:14.93
+avahi-daemon: 0:05.00
+/usr/bin/nodejs server.js: 37.79, 10.64, 
+
 
