@@ -1,0 +1,9 @@
+Timing Notes for Debian on BeagleBone Blue
+
+Is apache2 server needed?
+
+Is variation less when not running Cloud9?
+
+avahi-daemon is using lost of cycles?
+
+
