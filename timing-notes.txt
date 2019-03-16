@@ -17,4 +17,40 @@ sshd: debian@pts/4: 0:14.93
 avahi-daemon: 0:05.00
 /usr/bin/nodejs server.js: 37.79, 10.64, 
 
+turn off wifi:
+connmanctl> services
+connmanctl> disable wifi
+
+./TimingTest: use sort on logfile.csv to find maximum delay.
+sort -n --key=3 logfile.csv
+worst case = 4496 us at tick 576
+
+Here I did
+sudo kill -9 {avahi-daemon, rc_battery_monitor, apache2}.
+
+After boot, before killing any jobs:
+max 10554 us, 20x > 5000 us
+
+Closing cloud9:
+max 4050.906, 4x > 300 us
+
+killing rc_battery_monitor:
+max 4230, 2899, 15X > 200 us
+
+no htop:
+max 4577, 3564, 2578, 18X > 200 us
+
+disable wifi:
+max 2625, 17X > 200 us
+
+kill apache2:
+max 2273, 5X > 200 us, 20X > 100 us
+
+
+
+
+
+
+
+
 
