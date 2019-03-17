@@ -1,5 +1,9 @@
 Timing Notes for Debian on BeagleBone Blue
 
+https://plone.lucidsolutions.co.nz/hardware/raspberry-pi/3/disable-unwanted-raspbian-services
+# systemctl disable avahi-daemon
+# systemctl stop avahi-daemon
+
 Is apache2 server needed?
 
 Is variation less when not running Cloud9?
