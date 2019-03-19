@@ -10,6 +10,8 @@ Is variation less when not running Cloud9?
 
 avahi-daemon is using lost of cycles?
 
+debian irq/72-wl18xx: wireless interface?
+
 https://www.tldp.org/HOWTO/Security-Quickstart-HOWTO/services.html
 netstat -tap |grep LISTEN.
 
