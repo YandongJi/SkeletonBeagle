@@ -1,0 +1,60 @@
+Notes on (re)installing needed files/tools on Beagle Bone Blue
+(update 3/25/2019)
+
+1. Install from SD card
+Burning new image: https://beagleboard.org/latest-images
+ Debian 9.5 2018-10-07 4GB SD IoT 
+
+	Step #2: Install SD card programming utility: https://www.balena.io/etcher/
+	Step #3: Use etcher to write image to sd card
+	Step #4 Boot your board off of the SD card
+			Insert SD card into your (powered-down) board, while holding SD button
+			and apply power (over rides the on-board flash).
+
+----------------
+Flashing eMMC
+use nano editor to change:
+/boot/uEnv.txt to
+##enable Generic eMMC Flasher:
+cmdline=init=/opt/scripts/tools/eMMC/init-eMMC-flasher-v3.sh
+
+sudo nano (temppwd)
+
+Boot with flash card in, then remove flash card to run.
+(LEDs will repeat 0001-0010--0100-- etc until copied.- about 5 minutes)
+----------------------
+
+2. Setup Cloud9, and add necessary files/tools
+changing cloud9 default trajectory: use soft link to /home/debian
+ln -s /home/debian debian
+
+3. setup WiFi
+network:
+(to work with passwd, should use agent on)
+
+connmanctl> tether wifi off
+connmanctl> enable wifi
+connmanctl> scan wifi
+connmanctl> services 
+(at this point you should see your network appear along with other stuff, in my case it was "AR Crystal wifi_f45eab2f1ee1_6372797774616c_managed_psk") 
+[connmanctl> agent on]
+connmanctl> connect wifi_f45eab2f1ee1_6372797774616c_managed_psk
+connmanctl> quit
+
+ping google.com to check
+
+4. update software packages
+git clone https://github.com/ucb-ee192/SkeletonBeagle
+
+sudo apt-get update
+sudo apt-get zip
+sudo apt-get gdb
+sudo apt-get install libreadline-dev
+
+for PRU debugger:
+git clone https://github.com/RRvW/prudebug-rl
+
+
+
+
+
