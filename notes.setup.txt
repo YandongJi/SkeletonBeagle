@@ -47,8 +47,8 @@ ping google.com to check
 git clone https://github.com/ucb-ee192/SkeletonBeagle
 
 sudo apt-get update
-sudo apt-get zip
-sudo apt-get gdb
+sudo apt-get install zip
+sudo apt-get install gdb
 sudo apt-get install libreadline-dev
 
 for PRU debugger:
