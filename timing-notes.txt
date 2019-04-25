@@ -53,6 +53,8 @@ kill apache2:
 max 2273, 5X > 200 us, 20X > 100 us
 
 WATCH OUT- killed too many processes, and could not connect to BBB through network...
+Had to reflash!
+
 
 
 

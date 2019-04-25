@@ -54,6 +54,10 @@ sudo apt-get install libreadline-dev
 for PRU debugger:
 git clone https://github.com/RRvW/prudebug-rl
 
+5. setting up wifi without USB connection
+==> use laptop and 
+ssh -l debian 192.168.8.1
+
 
 
 
