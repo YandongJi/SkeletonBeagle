@@ -50,21 +50,7 @@ typedef struct setpoint_t{
 	double gamma_dot;	///< rate at which gamma setpoint updates (rad/s)
 }setpoint_t;
 
-/**
- * This is the system state written to by the balance controller.
- */
-typedef struct core_state_t{
-	double wheelAngleR;	///< wheel rotation relative to body
-	double wheelAngleL;
-	double theta;		///< body angle radians
-	double phi;		///< average wheel angle in global frame
-	double gamma;		///< body turn (yaw) angle radians
-	double vBatt;		///< battery voltage
-	double d1_u;		///< output of balance controller D1 to motors
-	double d2_u;		///< output of position controller D2 (theta_ref)
-	double d3_u;		///< output of steering controller D3 to motors
-	double mot_drive;	///< u compensated for battery voltage
-} core_state_t;
+
 
 // possible modes, user selected with command line arguments
 typedef enum m_input_mode_t{
@@ -79,7 +65,7 @@ static void __balance_controller(void);		///< mpu interrupt routine
 static void* __setpoint_manager(void* ptr);	///< background thread
 static void* __battery_checker(void* ptr);	///< background thread
 static void* __printf_loop(void* ptr);		///< background thread
-static void* telem_loop(void* ptr);		///< background thread
+extern void* telem_loop(void* ptr);		///< background thread
 static int __zero_out_controller(void);
 static int __disarm_controller(void);
 static int __arm_controller(void);
@@ -91,7 +77,7 @@ static void __on_mode_release(void);
 
 // global variables
 // Must be declared static so they get zero initalized
-static core_state_t cstate;
+core_state_t cstate;
 static setpoint_t setpoint;
 static rc_filter_t D1 = RC_FILTER_INITIALIZER;
 static rc_filter_t D2 = RC_FILTER_INITIALIZER;
@@ -99,7 +85,7 @@ static rc_filter_t D3 = RC_FILTER_INITIALIZER;
 static rc_mpu_data_t mpu_data;
 static m_input_mode_t m_input_mode = DSM;
 static uint64_t start_time, end_time, run_time;
-static long ticks = 0;
+long ticks = 0;
 static uint64_t max_time, min_time;
 FILE *logfile;
 char filename[80];
@@ -132,6 +118,8 @@ int main(int argc, char *argv[])
 	pthread_t telem_thread = 0;
 	bool adc_ok = true;
 	bool quiet = false;
+
+	printf("Kamigami controller 4/25/2019\n");
 
 	// parse arguments
 	opterr = 0;
@@ -211,7 +199,7 @@ int main(int argc, char *argv[])
     duty= 0.0;
     printf("sending duty cycle %0.4f\n", duty);
                 rc_motor_set(2,duty);
-	// start dsm listener
+	// start dsm listener *NOT USED FOR KAMIGAMI*
 	if(m_input_mode == DSM){
 		if(rc_dsm_init()==-1){
 			fprintf(stderr,"failed to start initialize DSM\n");
@@ -353,7 +341,7 @@ int main(int argc, char *argv[])
 /* figure start and end time */
 /* log file initialization just before starting  */
 /************************************ */
-	start_time = rc_nanos_thread_time();
+	start_time = rc_nanos_since_boot();
 	min_time = 1000000000; // a big number, 1e9 ns
 	strcpy(filename, "logfile.csv");
 	logfile = fopen(filename,"w");
@@ -362,7 +350,7 @@ int main(int argc, char *argv[])
    { printf("can't open file %s  \n", filename);
           return(-1);
    }
-   fprintf(logfile," 'ticks','ns time', 'gamma'\n");	
+   fprintf(logfile," 'ticks','ms time', 'gamma', 'dutyL', 'dutyR'\n");	
    
    if(rc_pthread_create(&telem_thread, telem_loop, (void*) NULL, SCHED_OTHER, 0))
    {  fprintf(stderr, "failed to start telem thread\n");
@@ -422,7 +410,7 @@ int main(int argc, char *argv[])
 	if (battery_thread) rc_pthread_timed_join(battery_thread, NULL, 1.5);
 	if (printf_thread) rc_pthread_timed_join(printf_thread, NULL, 1.5);
 	if (telem_thread) rc_pthread_timed_join(telem_thread, NULL, 1.5);
-    
+   
     
 	// cleanup
 	rc_filter_free(&D1);
@@ -436,14 +424,13 @@ int main(int argc, char *argv[])
 	rc_button_cleanup();	// stop button handlers
 	rc_remove_pid_file();	// remove pid file LAST
     
-    end_time = rc_nanos_thread_time();
+    end_time = rc_nanos_since_boot();
 	run_time = end_time - start_time;
 	printf("control thread time: %" PRIu64 "ns\n",run_time);
 	printf("min control thread latency: %" PRIu64 "ns\n",min_time);
 	printf("max control thread latency: %" PRIu64 "ns\n",max_time);
 	printf("# of ticks %ld \n",ticks);
 	
-
 	return 0;
 }
 
@@ -591,9 +578,9 @@ static void __balance_controller(void)
 	
 	/* test timing of interrupt in Linux environment */
 	ticks++;
-	end_time = rc_nanos_thread_time();
+	end_time = rc_nanos_since_boot();
 	run_time = end_time - start_time;  // time since previous interrupt
-	start_time = rc_nanos_thread_time();
+	start_time = rc_nanos_since_boot();
 	
 	if (ticks>10) // ignore initial startup of asynch process
 	{	if (run_time < min_time) 
@@ -641,10 +628,15 @@ static void __balance_controller(void)
 	* Send signal to motors
 	* multiply by polarity to make sure direction is correct.
 	***********************************************************/
-	dutyL = DIFF_DRIVE_GAIN * cstate.gamma + V_FORWARD;
-	dutyR = -DIFF_DRIVE_GAIN * cstate.gamma + V_FORWARD;
+	// dutyL = DIFF_DRIVE_GAIN * cstate.gamma + V_FORWARD;
+	// dutyR = -DIFF_DRIVE_GAIN * cstate.gamma + V_FORWARD;
+	dutyL = DIFF_DRIVE_GAIN * cstate.gamma + setpoint.phi_dot;
+	dutyR = -DIFF_DRIVE_GAIN * cstate.gamma + setpoint.phi_dot;
 	dutyL = fmax(-0.25, fmin(dutyL,0.25));
 	dutyR = fmax(-0.25, fmin(dutyR,0.25));
+	cstate.dutyL = dutyL;
+	cstate.dutyR = dutyR;
+	
 	//fprintf(logfile, "%6.3f , %6.3f  ", dutyL, dutyR);  // only for debugging- file IO slows down control
 	rc_motor_set(MOTOR_CHANNEL_L, MOTOR_POLARITY_L * dutyL);
 	rc_motor_set(MOTOR_CHANNEL_R, MOTOR_POLARITY_R * dutyR);
@@ -876,53 +868,4 @@ static void __on_mode_release(void)
 }
 
 
-// direct version, might be slow if malloc etc is needed
-// static void writeTelemetry(long ticks, uint64_t time)
-// {  // just data for csv format
-//     fprintf(logfile, "%ld, ", ticks);
-//     fprintf(logfile, "%" PRIu64 "\n",time);
-// 	return;
-// }
 
-// thread version
-/**
- * prints telem data to file
- *
- * @return     nothing, NULL pointer
- */
-
-// static void* telem_loop(__attribute__ ((unused)) void* ptr)
-// {  // just data for csv format
-// 	start_time = rc_nanos_thread_time();
-//  //   fprintf(logfile, "%ld, ", ticks);
-//  //   fprintf(logfile, "%" PRIu64 "\n",start_time);
-//     printf("telem thread\n");
-//     fflush(stdout); // empty buffer on every thread pass
-// 	return NULL;
-// }
-
-/**
- * prints diagnostics to console this only gets started if executing from
- * terminal
- *
- * @return     nothing, NULL pointer
- */
-static void* telem_loop(__attribute__ ((unused)) void* ptr)
-{	long old_tick=0;
-	printf("telem thread\n");
-    fflush(stdout); // empty buffer on every thread pass
-	while(rc_get_state()!=EXITING)
-	{  // just data for csv format
-		start_time = rc_nanos_thread_time();
-		old_tick = ticks;
-		fprintf(logfile, "%ld, ", old_tick);  // pass value which not changing by other process
-		fprintf(logfile, "%" PRIu64 ",",start_time);
-		fprintf(logfile,"%8.3f, ", cstate.gamma);
-		fprintf(logfile,"\n");
-		while(old_tick == ticks)
-		{ rc_usleep(100); // sleep 100 us
-		}
-    }
-	rc_usleep(1000000 / PRINTF_HZ);
-	return NULL;
-}

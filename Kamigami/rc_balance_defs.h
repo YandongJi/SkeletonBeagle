@@ -79,4 +79,23 @@
 #define ENABLE_POSITION_HOLD	1
 #define SOFT_START_SEC		0.7
 
+
+/**
+ * This is the system state written to by the balance controller.
+ */
+typedef struct core_state_t{
+	double wheelAngleR;	///< wheel rotation relative to body
+	double wheelAngleL;
+	double theta;		///< body angle radians
+	double phi;		///< average wheel angle in global frame
+	double gamma;		///< body turn (yaw) angle radians
+	double vBatt;		///< battery voltage
+	double d1_u;		///< output of balance controller D1 to motors
+	double d2_u;		///< output of position controller D2 (theta_ref)
+	double d3_u;		///< output of steering controller D3 to motors
+	double dutyR, dutyL; // duty cycle for left an dright leg motors
+	double mot_drive;	///< u compensated for battery voltage
+} core_state_t;
+
+
 #endif	// endif RC_BALANCE_CONFIG
