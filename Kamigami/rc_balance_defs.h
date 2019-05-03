@@ -81,6 +81,27 @@
 
 
 /**
+ * NOVICE: Drive rate and turn rate are limited to make driving easier.
+ * ADVANCED: Faster drive and turn rate for more fun.
+ */
+typedef enum drive_mode_t{
+	NOVICE,
+	ADVANCED
+}drive_mode_t;
+
+/**
+ * ARMED or DISARMED to indicate if the controller is running
+ */
+typedef enum arm_state_t{
+	ARMED,
+	DISARMED
+}arm_state_t;
+
+
+
+
+
+/**
  * This is the system state written to by the balance controller.
  */
 typedef struct core_state_t{
@@ -96,6 +117,29 @@ typedef struct core_state_t{
 	double dutyR, dutyL; // duty cycle for left an dright leg motors
 	double mot_drive;	///< u compensated for battery voltage
 } core_state_t;
+
+
+// possible modes, user selected with command line arguments
+typedef enum m_input_mode_t{
+	NONE,
+	DSM,
+	STDIN
+} m_input_mode_t;
+
+/**
+ * Feedback controller setpoint written to by setpoint_manager and read by the
+ * controller.
+ */
+typedef struct setpoint_t{
+	arm_state_t arm_state;	///< see arm_state_t declaration
+	drive_mode_t drive_mode;///< NOVICE or ADVANCED
+	double theta;		///< body lean angle (rad)
+	double phi;		///< wheel position (rad)
+	double phi_dot;		///< rate at which phi reference updates (rad/s)
+	double gamma;		///< body turn angle (rad)
+	double gamma_dot;	///< rate at which gamma setpoint updates (rad/s)
+}setpoint_t;
+
 
 
 #endif	// endif RC_BALANCE_CONFIG

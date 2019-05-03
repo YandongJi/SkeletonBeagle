@@ -19,57 +19,19 @@
 #define DIFF_DRIVE_GAIN 0.5 // 50% duty cycle for 1 radian error
 #define V_FORWARD 0.15 // nominal forward PWM
 
-/**
- * NOVICE: Drive rate and turn rate are limited to make driving easier.
- * ADVANCED: Faster drive and turn rate for more fun.
- */
-typedef enum drive_mode_t{
-	NOVICE,
-	ADVANCED
-}drive_mode_t;
-
-/**
- * ARMED or DISARMED to indicate if the controller is running
- */
-typedef enum arm_state_t{
-	ARMED,
-	DISARMED
-}arm_state_t;
-
-/**
- * Feedback controller setpoint written to by setpoint_manager and read by the
- * controller.
- */
-typedef struct setpoint_t{
-	arm_state_t arm_state;	///< see arm_state_t declaration
-	drive_mode_t drive_mode;///< NOVICE or ADVANCED
-	double theta;		///< body lean angle (rad)
-	double phi;		///< wheel position (rad)
-	double phi_dot;		///< rate at which phi reference updates (rad/s)
-	double gamma;		///< body turn angle (rad)
-	double gamma_dot;	///< rate at which gamma setpoint updates (rad/s)
-}setpoint_t;
-
-
-
-// possible modes, user selected with command line arguments
-typedef enum m_input_mode_t{
-	NONE,
-	DSM,
-	STDIN
-} m_input_mode_t;
-
 
 static void __print_usage(void);
 static void __balance_controller(void);		///< mpu interrupt routine
-static void* __setpoint_manager(void* ptr);	///< background thread
+extern void* __setpoint_manager(void* ptr);	///< background thread
 static void* __battery_checker(void* ptr);	///< background thread
 static void* __printf_loop(void* ptr);		///< background thread
 extern void* telem_loop(void* ptr);		///< background thread
-static int __zero_out_controller(void);
-static int __disarm_controller(void);
-static int __arm_controller(void);
-static int __wait_for_starting_condition(void);
+
+int __zero_out_controller(void);
+int __disarm_controller(void);
+int __arm_controller(void);
+
+
 static void __on_pause_press(void);
 static void __on_mode_release(void);
 // static void writeTelemetry(long, uint64_t);  // not used if thread version used
@@ -78,12 +40,12 @@ static void __on_mode_release(void);
 // global variables
 // Must be declared static so they get zero initalized
 core_state_t cstate;
-static setpoint_t setpoint;
+setpoint_t setpoint;
+m_input_mode_t m_input_mode = DSM;
 static rc_filter_t D1 = RC_FILTER_INITIALIZER;
 static rc_filter_t D2 = RC_FILTER_INITIALIZER;
 static rc_filter_t D3 = RC_FILTER_INITIALIZER;
 static rc_mpu_data_t mpu_data;
-static m_input_mode_t m_input_mode = DSM;
 static uint64_t start_time, end_time, run_time;
 long ticks = 0;
 static uint64_t max_time, min_time;
@@ -91,6 +53,7 @@ FILE *logfile;
 char filename[80];
 double duty; // temp: test duty cycle
 int ch; // motor channel
+
 
 /*
  * printed if some invalid argument was given
@@ -192,13 +155,7 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 	rc_motor_standby(1); // start with motors in standby
-	duty = 0.2;
-	printf("sending duty cycle %0.4f\n", duty);
-                rc_motor_set(2,duty);
-    rc_usleep(2000000);
-    duty= 0.0;
-    printf("sending duty cycle %0.4f\n", duty);
-                rc_motor_set(2,duty);
+	
 	// start dsm listener *NOT USED FOR KAMIGAMI*
 	if(m_input_mode == DSM){
 		if(rc_dsm_init()==-1){
@@ -219,7 +176,12 @@ int main(int argc, char *argv[])
 	// make our own safely.
 	rc_make_pid_file();
 
-	printf("\nPress and release MODE button to toggle DSM drive mode\n");
+
+
+
+	printf("\n q to quit in stdin mode\n");
+	printf("stdin mode: l +left, r +right, f +fwd, b +bkwd\n");
+	printf("Press and release MODE button to toggle DSM drive mode\n");
 	printf("Press and release PAUSE button to pause/start the motors\n");
 	printf("hold pause button down for 2 seconds to exit\n");
 
@@ -296,6 +258,25 @@ int main(int argc, char *argv[])
 	// wait for the battery thread to make the first read
 	while(cstate.vBatt<1.0 && rc_get_state()!=EXITING) rc_usleep(10000);
 
+
+
+      
+      
+/*  * ********************************** */
+/* figure start and end time */
+/* log file initialization just before starting  */
+/************************************ */
+
+	min_time = 1000000000; // a big number, 1e9 ns
+	strcpy(filename, "logfile.csv");
+	logfile = fopen(filename,"w");
+   printf(" returned from open %s. \n",filename);
+   if ( logfile == NULL)
+   { printf("can't open file %s  \n", filename);
+          return(-1);
+   }
+   fprintf(logfile," 'ticks','ms time', 'gamma', 'dutyL', 'dutyR'\n");	
+
 	// start printf_thread if running from a terminal
 	// if it was started as a background process then don't bother
 	if(isatty(fileno(stdout)) && (quiet == false)){
@@ -324,6 +305,7 @@ int main(int argc, char *argv[])
 	    if(rc_motor_init()) return -1;
         rc_motor_standby(0); // make sure not in standby
         duty = 0.2; ch =2;
+        printf("initialization done.\n");
         printf("sending motor %d duty cycle %0.4f\n",ch, duty);
         rc_motor_set(ch,duty);
         rc_usleep(1500000);
@@ -333,24 +315,8 @@ int main(int argc, char *argv[])
         printf("sending motor %d duty cycle %0.4f\n",ch, duty);
         rc_motor_set(ch,duty);
         rc_usleep(1500000);
-      /*                */
-      
-      
-      
-    /*  * ********************************** */
-/* figure start and end time */
-/* log file initialization just before starting  */
-/************************************ */
-	start_time = rc_nanos_since_boot();
-	min_time = 1000000000; // a big number, 1e9 ns
-	strcpy(filename, "logfile.csv");
-	logfile = fopen(filename,"w");
-   printf(" returned from open. \n");
-   if ( logfile == NULL)
-   { printf("can't open file %s  \n", filename);
-          return(-1);
-   }
-   fprintf(logfile," 'ticks','ms time', 'gamma', 'dutyL', 'dutyR'\n");	
+        rc_motor_set(ch,0.0); // turn off again
+        /*                */
    
    if(rc_pthread_create(&telem_thread, telem_loop, (void*) NULL, SCHED_OTHER, 0))
    {  fprintf(stderr, "failed to start telem thread\n");
@@ -370,22 +336,20 @@ int main(int argc, char *argv[])
  /******************************************************** */
 	// start in the RUNNING state, pressing the pause button will swap to
 	// the PAUSED state then back again.
-	printf("\nHold your MIP upright to begin balancing\n");
+
 	rc_set_state(RUNNING);
 	
-	// see if threads are set up
-	printf("printf thread properties:");
-	rc_pthread_print_properties(printf_thread);
-	printf("telemetry thread properties:");
-	rc_pthread_print_properties(telem_thread);
+	// // see if threads are set up
+	// printf("printf thread properties:");
+	// rc_pthread_print_properties(printf_thread);
+	// printf("telemetry thread properties:");
+	// rc_pthread_print_properties(telem_thread);
 
 	// chill until something exits the program
 	rc_set_state(RUNNING);  // turns on all threads, etc
 	rc_motor_standby(0); // make sure motor is running
 	
-	
-	
-        
+/*  wait here until exiting control loop */	
 	while(rc_get_state()!=EXITING){
 		rc_usleep(200000);
 	}
@@ -393,16 +357,10 @@ int main(int argc, char *argv[])
 /* exiting and clean up code */
 /*******************************************/
 
-
-	run_time = end_time - start_time;
-        printf("control thread time: %" PRIu64 "ns\n",run_time);
 	if(fclose(logfile) == 0)
 	{ printf("%s closed successfully\n", filename); // close log file before exiting
 	}
  	rc_usleep(200000); /* give time to print*/
-
-
-
 
 	// join threads
 	// pthread_join - wait for thread termination
@@ -410,7 +368,6 @@ int main(int argc, char *argv[])
 	if (battery_thread) rc_pthread_timed_join(battery_thread, NULL, 1.5);
 	if (printf_thread) rc_pthread_timed_join(printf_thread, NULL, 1.5);
 	if (telem_thread) rc_pthread_timed_join(telem_thread, NULL, 1.5);
-   
     
 	// cleanup
 	rc_filter_free(&D1);
@@ -424,150 +381,14 @@ int main(int argc, char *argv[])
 	rc_button_cleanup();	// stop button handlers
 	rc_remove_pid_file();	// remove pid file LAST
     
-    end_time = rc_nanos_since_boot();
-	run_time = end_time - start_time;
-	printf("control thread time: %" PRIu64 "ns\n",run_time);
-	printf("min control thread latency: %" PRIu64 "ns\n",min_time);
-	printf("max control thread latency: %" PRIu64 "ns\n",max_time);
+ //	printf("control thread time: %" PRIu64 "ns\n",run_time);
+   	printf("min control thread latency: %10.3f ms\n",((double)min_time)/1e6);
+	printf("max control thread latency: %10.3f ms\n",((double) max_time)/1e6);
 	printf("# of ticks %ld \n",ticks);
 	
 	return 0;
 }
 
-/**
- * This thread is in charge of adjusting the controller setpoint based on user
- * inputs from dsm radio control. Also detects pickup to control arming the
- * controller.
- *
- * @param      ptr   The pointer
- *
- * @return     { description_of_the_return_value }
- */
-void* __setpoint_manager(__attribute__ ((unused)) void* ptr)
-{
-	double drive_stick, turn_stick; // input sticks
-	int i, ch, chan, stdin_timeout = 0; // for stdin input
-	char in_str[11];
-
-	// wait for mpu to settle
-	__disarm_controller();
-	rc_usleep(2500000);
-	rc_set_state(RUNNING);
-	rc_led_set(RC_LED_RED,0);
-	rc_led_set(RC_LED_GREEN,1);
-
-	while(rc_get_state()!=EXITING){
-		// clear out input of old data before waiting for new data
-		if(m_input_mode == STDIN) fseek(stdin,0,SEEK_END);
-
-		// sleep at beginning of loop so we can use the 'continue' statement
-		rc_usleep(1000000/SETPOINT_MANAGER_HZ);
-
-		// nothing to do if paused, go back to beginning of loop
-		if(rc_get_state() != RUNNING || m_input_mode == NONE) continue;
-
-		// if we got here the state is RUNNING, but controller is not
-		// necessarily armed. If DISARMED, wait for the user to pick MIP up
-		// which will we detected by wait_for_starting_condition()
-		if(setpoint.arm_state == DISARMED){
-			if(__wait_for_starting_condition()==0){
-				__zero_out_controller();
-				__arm_controller();
-			}
-			else continue;
-		}
-
-		// if dsm is active, update the setpoint rates
-		switch(m_input_mode){
-		case NONE:
-			continue;
-		case DSM:
-			if(rc_dsm_is_new_data()){
-				// Read normalized (+-1) inputs from RC radio stick and multiply by
-				// polarity setting so positive stick means positive setpoint
-				turn_stick  = rc_dsm_ch_normalized(DSM_TURN_CH) * DSM_TURN_POL;
-				drive_stick = rc_dsm_ch_normalized(DSM_DRIVE_CH)* DSM_DRIVE_POL;
-
-				// saturate the inputs to avoid possible erratic behavior
-				rc_saturate_double(&drive_stick,-1,1);
-				rc_saturate_double(&turn_stick,-1,1);
-
-				// use a small deadzone to prevent slow drifts in position
-				if(fabs(drive_stick)<DSM_DEAD_ZONE) drive_stick = 0.0;
-				if(fabs(turn_stick)<DSM_DEAD_ZONE)  turn_stick  = 0.0;
-
-				// translate normalized user input to real setpoint values
-				switch(setpoint.drive_mode){
-				case NOVICE:
-					setpoint.phi_dot   = DRIVE_RATE_NOVICE * drive_stick;
-					setpoint.gamma_dot =  TURN_RATE_NOVICE * turn_stick;
-					break;
-				case ADVANCED:
-					setpoint.phi_dot   = DRIVE_RATE_ADVANCED * drive_stick;
-					setpoint.gamma_dot = TURN_RATE_ADVANCED  * turn_stick;
-					break;
-				default: break;
-				}
-			}
-			// if dsm had timed out, put setpoint rates back to 0
-			else if(rc_dsm_is_connection_active()==0){
-				setpoint.theta = 0;
-				setpoint.phi_dot = 0;
-				setpoint.gamma_dot = 0;
-				continue;
-			}
-			break;
-		case STDIN:
-			i = 0;
-
-			while ((ch = getchar()) != EOF && i < 10){
-				stdin_timeout = 0;
-				if(ch == 'n' || ch == '\n'){
-					if(i > 2){
-						in_str[i-2] = '\0'; // Null terminate string in case this command is shorter than last one
-						if(chan == DSM_TURN_CH){
-							turn_stick = strtof(in_str, NULL) * DSM_TURN_POL;
-							setpoint.gamma_dot = turn_stick;
-						}
-						else if(chan == DSM_DRIVE_CH){
-							drive_stick = strtof(in_str, NULL) * DSM_DRIVE_POL;
-							setpoint.phi_dot = drive_stick;
-						}
-					}
-					if(ch == 'n') i = 1;
-					else i = 0;
-				}
-				else if(i == 1){
-					chan = ch - 0x30;
-					i = 2;
-				}
-				else{
-					in_str[i-2] = ch;
-					i++;
-				}
-			}
-
-			// if it has been more than 1 second since getting data
-			if(stdin_timeout >= SETPOINT_MANAGER_HZ){
-				setpoint.theta = 0;
-				setpoint.phi_dot = 0;
-				setpoint.gamma_dot = 0;
-			}
-			else{
-				stdin_timeout++;
-			}
-			continue;
-			break;
-		default:
-			fprintf(stderr,"ERROR in setpoint manager, invalid input mode\n");
-			break;
-		}
-	}
-
-	// if state becomes EXITING the above loop exists and we disarm here
-	__disarm_controller();
-	return NULL;
-}
 
 /**
  * discrete-time balance controller operated off mpu interrupt Called at
@@ -614,24 +435,16 @@ static void __balance_controller(void)
 		return;
 	}
 
-	// check for a tipover
-	// if(fabs(cstate.theta) > TIP_ANGLE){
-	// 	__disarm_controller();
-	// 	printf("tip detected \n");
-	// 	return;
-	// }
 
-	
-
-	
 	/**********************************************************
 	* Send signal to motors
 	* multiply by polarity to make sure direction is correct.
 	***********************************************************/
+	// gamma dot is turning rate, phi_dot is forward rate 
 	// dutyL = DIFF_DRIVE_GAIN * cstate.gamma + V_FORWARD;
 	// dutyR = -DIFF_DRIVE_GAIN * cstate.gamma + V_FORWARD;
-	dutyL = DIFF_DRIVE_GAIN * cstate.gamma + setpoint.phi_dot;
-	dutyR = -DIFF_DRIVE_GAIN * cstate.gamma + setpoint.phi_dot;
+	dutyL = DIFF_DRIVE_GAIN * cstate.gamma + setpoint.phi_dot + setpoint.gamma_dot;
+	dutyR = -DIFF_DRIVE_GAIN * cstate.gamma + setpoint.phi_dot - setpoint.gamma_dot;
 	dutyL = fmax(-0.25, fmin(dutyL,0.25));
 	dutyR = fmax(-0.25, fmin(dutyR,0.25));
 	cstate.dutyL = dutyL;
@@ -649,7 +462,7 @@ static void __balance_controller(void)
  *
  * @return     { description_of_the_return_value }
  */
-static int __zero_out_controller(void)
+int __zero_out_controller(void)
 {
 	rc_filter_reset(&D1);
 	rc_filter_reset(&D2);
@@ -666,7 +479,8 @@ static int __zero_out_controller(void)
  *
  * @return     { description_of_the_return_value }
  */
-static int __disarm_controller(void)
+
+int __disarm_controller(void)
 {
 	rc_motor_standby(1);
 	rc_motor_free_spin(0);
@@ -681,7 +495,7 @@ static int __disarm_controller(void)
  *
  * @return     0 on success, -1 on failure
  */
-static int __arm_controller(void)
+int __arm_controller(void)
 {
 	__zero_out_controller();
 	rc_encoder_eqep_write(ENCODER_CHANNEL_L,0);
@@ -692,45 +506,6 @@ static int __arm_controller(void)
 	return 0;
 }
 
-/**
- * Wait for MiP to be held upright long enough to begin. Returns
- *
- * @return     0 if successful, -1 if the wait process was interrupted by pause
- *             button or shutdown signal.
- */
-static int __wait_for_starting_condition(void)
-{
-	int checks = 0;
-	const int check_hz = 20;	// check 20 times per second
-	int checks_needed = round(START_DELAY*check_hz);
-	int wait_us = 1000000/check_hz;
-
-	// wait for MiP to be tipped back or forward first
-	// exit if state becomes paused or exiting
-	while(rc_get_state()==RUNNING){
-		// if within range, start counting
-		if(fabs(cstate.theta) > START_ANGLE) checks++;
-		// fell out of range, restart counter
-		else checks = 0;
-		// waited long enough, return
-		if(checks >= checks_needed) break;
-		rc_usleep(wait_us);
-	}
-	// now wait for MiP to be upright
-	checks = 0;
-	// exit if state becomes paused or exiting
-	while(rc_get_state()==RUNNING){
-		// if within range, start counting
-		if(fabs(cstate.theta) < START_ANGLE) checks++;
-		// fell out of range, restart counter
-		else checks = 0;
-		// waited long enough, return
-		if(checks >= checks_needed) return 0;
-		rc_usleep(wait_us);
-	}
-//	return -1;
-	return 0; // to run board continuously without robot
-}
 
 /**
  * Slow loop checking battery voltage. Also changes the D1 saturation limit
@@ -765,14 +540,14 @@ static void* __printf_loop(__attribute__ ((unused)) void* ptr)
 		new_rc_state = rc_get_state();
 		// check if this is the first time since being paused
 		if(new_rc_state==RUNNING && last_rc_state!=RUNNING){
-			printf("\nRUNNING: Hold upright to balance.\n");
+			printf("\nRUNNING:\n");
 			printf("    θ    |");
 			printf("  θ_ref  |");
 			printf("    φ    |");
 			printf("  φ_ref  |");
 			printf("    γ    |");
-			printf("  D1_u   |");
-			printf("  D3_u   |");
+			printf("  uLeft  |");
+			printf("  uRight |");
 			printf("  vBatt  |");
 			printf("arm_state|");
 			printf("\n");
@@ -790,8 +565,8 @@ static void* __printf_loop(__attribute__ ((unused)) void* ptr)
 			printf("%7.3f  |", cstate.phi);
 			printf("%7.3f  |", setpoint.phi);
 			printf("%7.3f  |", cstate.gamma);
-			printf("%7.3f  |", cstate.d1_u);
-			printf("%7.3f  |", cstate.d3_u);
+			printf("%7.3f  |", cstate.dutyL);
+			printf("%7.3f  |", cstate.dutyR);
 			printf("%7.3f  |", cstate.vBatt);
 
 			if(setpoint.arm_state == ARMED) printf("  ARMED  |");
@@ -802,6 +577,8 @@ static void* __printf_loop(__attribute__ ((unused)) void* ptr)
 	}
 	return NULL;
 }
+
+
 
 /**
  * Disarm the controller and set system state to paused. If the user holds the
