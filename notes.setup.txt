@@ -55,8 +55,9 @@ for PRU debugger:
 git clone https://github.com/RRvW/prudebug-rl
 
 5. setting up wifi without USB connection
-==> use laptop and 
+==> use laptop (open network connection to Beaglebone-XXXX) and 
 ssh -l debian 192.168.8.1
+(desktop does not have wifi)
 
 
 

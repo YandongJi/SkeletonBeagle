@@ -18,13 +18,14 @@
 #include "rc_balance_defs.h"
 #define DIFF_DRIVE_GAIN 0.5 // 50% duty cycle for 1 radian error
 #define V_FORWARD 0.15 // nominal forward PWM
+#define MAX_PWM 0.4 // kamigami uses only single cell
 
 
 static void __print_usage(void);
 static void __balance_controller(void);		///< mpu interrupt routine
 extern void* __setpoint_manager(void* ptr);	///< background thread
 static void* __battery_checker(void* ptr);	///< background thread
-static void* __printf_loop(void* ptr);		///< background thread
+extern void* __printf_loop(void* ptr);		///< background thread
 extern void* telem_loop(void* ptr);		///< background thread
 
 int __zero_out_controller(void);
@@ -179,9 +180,12 @@ int main(int argc, char *argv[])
 
 
 
+
+	printf("Safe Shutdown! sudo poweroff\n ------------------- \n");
+	printf("usage: ./kamigami-control -i stdin\n");
 	printf("\n q to quit in stdin mode\n");
 	printf("stdin mode: l +left, r +right, f +fwd, b +bkwd\n");
-	printf("Press and release MODE button to toggle DSM drive mode\n");
+//	printf("Press and release MODE button to toggle DSM drive mode\n");
 	printf("Press and release PAUSE button to pause/start the motors\n");
 	printf("hold pause button down for 2 seconds to exit\n");
 
@@ -237,7 +241,7 @@ int main(int argc, char *argv[])
 	// printf("\nOuter Loop controller D2:\n");
 	// rc_filter_print(D2);
 
-	// set up D3 gamma (steering) controller
+	// set up D3 yaw (steering) controller
 	if(rc_filter_pid(&D3, D3_KP, D3_KI, D3_KD, 4*DT, DT)){
 		fprintf(stderr,"ERROR in rc_balance, failed to make steering controller\n");
 		return -1;
@@ -275,16 +279,9 @@ int main(int argc, char *argv[])
    { printf("can't open file %s  \n", filename);
           return(-1);
    }
-   fprintf(logfile," 'ticks','ms time', 'gamma', 'dutyL', 'dutyR'\n");	
+   fprintf(logfile," 'ticks','ms time', 'yaw', 'dutyL', 'dutyR'\n");	
 
-	// start printf_thread if running from a terminal
-	// if it was started as a background process then don't bother
-	if(isatty(fileno(stdout)) && (quiet == false)){
-		if(rc_pthread_create(&printf_thread, __printf_loop, (void*) NULL, SCHED_OTHER, 0)){
-			fprintf(stderr, "failed to start printf thread\n");
-			return -1;
-		}
-	}
+
 
 	// start mpu
 	if(rc_mpu_initialize_dmp(&mpu_data, mpu_config)){
@@ -303,19 +300,20 @@ int main(int argc, char *argv[])
 /* see if motor will turn on here */
 	    rc_motor_cleanup();  // close if already opened
 	    if(rc_motor_init()) return -1;
-        rc_motor_standby(0); // make sure not in standby
-        duty = 0.2; ch =2;
+        	rc_motor_standby(0); // make sure not in standby
+      
         printf("initialization done.\n");
-        printf("sending motor %d duty cycle %0.4f\n",ch, duty);
-        rc_motor_set(ch,duty);
-        rc_usleep(1500000);
-        rc_motor_set(ch,0.0);
-        
-        duty = 0.2; ch =3;
-        printf("sending motor %d duty cycle %0.4f\n",ch, duty);
-        rc_motor_set(ch,duty);
-        rc_usleep(1500000);
-        rc_motor_set(ch,0.0); // turn off again
+        /* basic motor test code for initial debugging */
+        // duty = 0.2; ch =2;
+        // printf("sending motor %d duty cycle %0.4f\n",ch, duty);
+        // rc_motor_set(ch,duty);
+        // rc_usleep(1500000);
+        // rc_motor_set(ch,0.0);
+        // duty = 0.2; ch =3;
+        // printf("sending motor %d duty cycle %0.4f\n",ch, duty);
+        // rc_motor_set(ch,duty);
+        // rc_usleep(1500000);
+        // rc_motor_set(ch,0.0); // turn off again
         /*                */
    
    if(rc_pthread_create(&telem_thread, telem_loop, (void*) NULL, SCHED_OTHER, 0))
@@ -325,6 +323,15 @@ int main(int argc, char *argv[])
  /* ************************     
 ***********************************************
 * ************************ */
+	rc_usleep(1000000); /* give time for threads to start*/
+	// start printf_thread if running from a terminal
+	// if it was started as a background process then don't bother
+	if(isatty(fileno(stdout)) && (quiet == false))
+	{	if(rc_pthread_create(&printf_thread, __printf_loop, (void*) NULL, SCHED_OTHER, 0)){
+			fprintf(stderr, "failed to start printf thread\n");
+			return -1;
+		}
+	}
 
 /**** this starts interrupts, so should be last init step ****/
 	// this should be the last step in initialization
@@ -415,8 +422,8 @@ static void __balance_controller(void)
 	* read sensors and compute the state when either ARMED or DISARMED
 	******************************************************************/
 	
-	// yaw steering angle gamma estimate- direct from gyro, need to integrate?
-	cstate.gamma = mpu_data.dmp_TaitBryan[TB_YAW_Z];
+	// yaw steering angle yaw estimate- direct from gyro, need to integrate?
+	cstate.yaw = mpu_data.dmp_TaitBryan[TB_YAW_Z];
 
 	/*************************************************************
 	* check for various exit conditions AFTER state estimate
@@ -440,13 +447,13 @@ static void __balance_controller(void)
 	* Send signal to motors
 	* multiply by polarity to make sure direction is correct.
 	***********************************************************/
-	// gamma dot is turning rate, phi_dot is forward rate 
-	// dutyL = DIFF_DRIVE_GAIN * cstate.gamma + V_FORWARD;
-	// dutyR = -DIFF_DRIVE_GAIN * cstate.gamma + V_FORWARD;
-	dutyL = DIFF_DRIVE_GAIN * cstate.gamma + setpoint.phi_dot + setpoint.gamma_dot;
-	dutyR = -DIFF_DRIVE_GAIN * cstate.gamma + setpoint.phi_dot - setpoint.gamma_dot;
-	dutyL = fmax(-0.25, fmin(dutyL,0.25));
-	dutyR = fmax(-0.25, fmin(dutyR,0.25));
+	// yaw dot is turning rate, 
+	// dutyL = DIFF_DRIVE_GAIN * cstate.yaw + V_FORWARD;
+	// dutyR = -DIFF_DRIVE_GAIN * cstate.yaw + V_FORWARD;
+	dutyL = DIFF_DRIVE_GAIN * cstate.yaw + setpoint.phi_dot + setpoint.yaw_dot;
+	dutyR = -DIFF_DRIVE_GAIN * cstate.yaw + setpoint.phi_dot - setpoint.yaw_dot;
+	dutyL = fmax(-MAX_PWM, fmin(dutyL,MAX_PWM));
+	dutyR = fmax(-MAX_PWM, fmin(dutyR,MAX_PWM));
 	cstate.dutyL = dutyL;
 	cstate.dutyR = dutyR;
 	
@@ -469,7 +476,7 @@ int __zero_out_controller(void)
 	rc_filter_reset(&D3);
 	setpoint.theta = 0.0;
 	setpoint.phi   = 0.0;
-	setpoint.gamma = 0.0;
+	setpoint.yaw = 0.0;
 	rc_motor_set(0,0.0);
 	return 0;
 }
@@ -522,58 +529,6 @@ static void* __battery_checker(__attribute__ ((unused)) void* ptr)
 		if (new_v>9.0 || new_v<5.0) new_v = V_NOMINAL;
 		cstate.vBatt = new_v;
 		rc_usleep(1000000 / BATTERY_CHECK_HZ);
-	}
-	return NULL;
-}
-
-/**
- * prints diagnostics to console this only gets started if executing from
- * terminal
- *
- * @return     nothing, NULL pointer
- */
-static void* __printf_loop(__attribute__ ((unused)) void* ptr)
-{
-	rc_state_t last_rc_state, new_rc_state; // keep track of last state
-	last_rc_state = rc_get_state();
-	while(rc_get_state()!=EXITING){
-		new_rc_state = rc_get_state();
-		// check if this is the first time since being paused
-		if(new_rc_state==RUNNING && last_rc_state!=RUNNING){
-			printf("\nRUNNING:\n");
-			printf("    θ    |");
-			printf("  θ_ref  |");
-			printf("    φ    |");
-			printf("  φ_ref  |");
-			printf("    γ    |");
-			printf("  uLeft  |");
-			printf("  uRight |");
-			printf("  vBatt  |");
-			printf("arm_state|");
-			printf("\n");
-		}
-		else if(new_rc_state==PAUSED && last_rc_state!=PAUSED){
-			printf("\nPAUSED: press pause again to start.\n");
-		}
-		last_rc_state = new_rc_state;
-
-		// decide what to print or exit
-		if(new_rc_state == RUNNING){
-			printf("\r");
-			printf("%7.3f  |", cstate.theta);
-			printf("%7.3f  |", setpoint.theta);
-			printf("%7.3f  |", cstate.phi);
-			printf("%7.3f  |", setpoint.phi);
-			printf("%7.3f  |", cstate.gamma);
-			printf("%7.3f  |", cstate.dutyL);
-			printf("%7.3f  |", cstate.dutyR);
-			printf("%7.3f  |", cstate.vBatt);
-
-			if(setpoint.arm_state == ARMED) printf("  ARMED  |");
-			else printf("DISARMED |");
-			fflush(stdout);
-		}
-		rc_usleep(1000000 / PRINTF_HZ);
 	}
 	return NULL;
 }

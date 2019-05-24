@@ -44,6 +44,7 @@ void* __setpoint_manager(__attribute__ ((unused)) void* ptr)
 	rc_led_set(RC_LED_RED,0);
 	rc_led_set(RC_LED_GREEN,1);
 	
+	
 	// set up character input without buffer
 	/* get the terminal settings for stdin */
 	tcgetattr(STDIN_FILENO,&old_tio);
@@ -52,7 +53,8 @@ void* __setpoint_manager(__attribute__ ((unused)) void* ptr)
 	/* disable canonical mode (buffered i/o) and local echo */
 	new_tio.c_lflag &=(~ICANON & ~ECHO);
 	/* set the new settings immediately */
-	tcsetattr(STDIN_FILENO,TCSANOW,&new_tio);
+	if(m_input_mode == STDIN) 
+	{ tcsetattr(STDIN_FILENO,TCSANOW,&new_tio);}
 
 
 	while(rc_get_state()!=EXITING){
@@ -96,11 +98,11 @@ void* __setpoint_manager(__attribute__ ((unused)) void* ptr)
 				switch(setpoint.drive_mode){
 				case NOVICE:
 					setpoint.phi_dot   = DRIVE_RATE_NOVICE * drive_stick;
-					setpoint.gamma_dot =  TURN_RATE_NOVICE * turn_stick;
+					setpoint.yaw_dot =  TURN_RATE_NOVICE * turn_stick;
 					break;
 				case ADVANCED:
 					setpoint.phi_dot   = DRIVE_RATE_ADVANCED * drive_stick;
-					setpoint.gamma_dot = TURN_RATE_ADVANCED  * turn_stick;
+					setpoint.yaw_dot = TURN_RATE_ADVANCED  * turn_stick;
 					break;
 				default: break;
 				}
@@ -109,7 +111,7 @@ void* __setpoint_manager(__attribute__ ((unused)) void* ptr)
 			else if(rc_dsm_is_connection_active()==0){
 				setpoint.theta = 0;
 				setpoint.phi_dot = 0;
-				setpoint.gamma_dot = 0;
+				setpoint.yaw_dot = 0;
 				continue;
 			}
 			break;
@@ -121,19 +123,19 @@ void* __setpoint_manager(__attribute__ ((unused)) void* ptr)
 			    if( (ch == 'q') || (ch == 'Q')) {
 			    	/* restore the former STDIN settings */
     				tcsetattr(STDIN_FILENO,TCSANOW,&old_tio);
-    				printf("Ending. Restored STDIN\n");
+    				printf("\nEnding. Restored STDIN\n");
 			    	rc_set_state(EXITING); } // turns off all threads
 			    	
 				if( ch == 'z')   // turn everything off
 				{ setpoint.theta = 0;
 				  setpoint.phi_dot = 0;
-				  setpoint.gamma_dot = 0;
+				  setpoint.yaw_dot = 0;
 				}
 				
-				if(ch == 'l') setpoint.gamma_dot = turn_stick; // turning rate
-				if(ch == 'r') setpoint.gamma_dot = -turn_stick;
-				if(ch == 'b') setpoint.phi_dot += drive_stick; // forward speed rate
-				if(ch == 'f') setpoint.phi_dot += drive_stick;
+				if(ch == 'l') setpoint.yaw_dot += turn_stick; // turning rate
+				if(ch == 'r') setpoint.yaw_dot -= turn_stick;
+				if(ch == 'f') setpoint.phi_dot += drive_stick; // forward speed rate
+				if(ch == 'b') setpoint.phi_dot -= drive_stick;
 				stdin_timeout = 0;
 			}
 
@@ -141,7 +143,7 @@ void* __setpoint_manager(__attribute__ ((unused)) void* ptr)
 			if(stdin_timeout >= SETPOINT_MANAGER_HZ){
 				setpoint.theta = 0;
 				setpoint.phi_dot = 0;
-				setpoint.gamma_dot = 0;
+				setpoint.yaw_dot = 0;
 				putchar('*'); // timeout
 			}
 			else{
