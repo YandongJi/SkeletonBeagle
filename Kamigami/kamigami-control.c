@@ -279,7 +279,7 @@ int main(int argc, char *argv[])
    { printf("can't open file %s  \n", filename);
           return(-1);
    }
-   fprintf(logfile," 'ticks','ms time', 'yaw', 'dutyL', 'dutyR'\n");	
+   fprintf(logfile," 'ticks','ms time', 'yaw', 'dutyL', 'dutyR', 'vBatt'\n");	
 
 
 

@@ -41,6 +41,7 @@ void* telem_loop(__attribute__ ((unused)) void* ptr)
 		fprintf(logfile, "%10.3f, ", (double)(current_time-initial_time)/1e6);
 		fprintf(logfile,"%8.3f, ", cstate.yaw);
 		fprintf(logfile,"%8.3f, %8.3f", cstate.dutyL, cstate.dutyR);
+		fprintf(logfile, "%8.3f", cstate.vBatt);
 		fprintf(logfile,"\n");
 		while(old_tick == ticks)
 		{ rc_usleep(100); // sleep 100 us
