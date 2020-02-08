@@ -54,10 +54,10 @@ sudo apt-get install libreadline-dev
 for PRU debugger:
 git clone https://github.com/RRvW/prudebug-rl
 
-5. setting up wifi without USB connection
-==> use laptop (open network connection to Beaglebone-XXXX) and 
+5. on laptop, open wifi connnection to BeagleBone-CC5D in network settings
 ssh -l debian 192.168.8.1
-(desktop does not have wifi)
+
+6. robot too heavy with battery and beagle bone, even at 40% PWM (8V)
 
 
 
